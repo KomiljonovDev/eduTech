@@ -17,7 +17,23 @@
                     </flux:sidebar.item>
                 </flux:sidebar.group>
 
-                <flux:sidebar.group heading="Boshqaruv" class="grid">
+                @role('manager')
+                <flux:sidebar.group heading="O'quv jarayoni" class="grid">
+                    <flux:sidebar.item icon="inbox" :href="route('admin.leads')" :current="request()->routeIs('admin.leads')" wire:navigate>
+                        Leadlar
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="user-group" :href="route('admin.students')" :current="request()->routeIs('admin.students')" wire:navigate>
+                        O'quvchilar
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="academic-cap" :href="route('admin.groups')" :current="request()->routeIs('admin.groups')" wire:navigate>
+                        Guruhlar
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="clipboard-document-check" :href="route('admin.attendance')" :current="request()->routeIs('admin.attendance')" wire:navigate>
+                        Davomat
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+
+                <flux:sidebar.group heading="Sozlamalar" class="grid">
                     <flux:sidebar.item icon="users" :href="route('admin.teachers')" :current="request()->routeIs('admin.teachers')" wire:navigate>
                         Ustozlar
                     </flux:sidebar.item>
@@ -27,23 +43,14 @@
                     <flux:sidebar.item icon="layout-grid" :href="route('admin.rooms')" :current="request()->routeIs('admin.rooms')" wire:navigate>
                         Xonalar
                     </flux:sidebar.item>
-                    <flux:sidebar.item icon="folder-git-2" :href="route('admin.groups')" :current="request()->routeIs('admin.groups')" wire:navigate>
-                        Guruhlar
+                    <flux:sidebar.item icon="receipt-percent" :href="route('admin.discounts')" :current="request()->routeIs('admin.discounts')" wire:navigate>
+                        Chegirmalar
                     </flux:sidebar.item>
                 </flux:sidebar.group>
+                @endrole
             </flux:sidebar.nav>
 
             <flux:spacer />
-
-            <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>

@@ -26,7 +26,11 @@
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @forelse ($groups as $group)
                     <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                        <td class="px-4 py-3 font-medium">{{ $group->name }}</td>
+                        <td class="px-4 py-3">
+                            <a href="{{ route('admin.groups.show', $group) }}" wire:navigate class="font-medium text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400">
+                                {{ $group->name }}
+                            </a>
+                        </td>
                         <td class="px-4 py-3">
                             <flux:badge size="sm">{{ $group->course->code }}</flux:badge>
                         </td>
@@ -54,8 +58,9 @@
                             @endswitch
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <flux:button variant="ghost" size="sm" wire:click="edit({{ $group->id }})" icon="pencil" />
-                            <flux:button variant="ghost" size="sm" wire:click="delete({{ $group->id }})" wire:confirm="Rostdan ham o'chirmoqchimisiz?" icon="trash" class="text-red-600 hover:text-red-700" />
+                            <flux:button variant="ghost" size="sm" :href="route('admin.groups.show', $group)" icon="eye" wire:navigate title="Ko'rish" />
+                            <flux:button variant="ghost" size="sm" wire:click="edit({{ $group->id }})" icon="pencil" title="Tahrirlash" />
+                            <flux:button variant="ghost" size="sm" wire:click="delete({{ $group->id }})" wire:confirm="Rostdan ham o'chirmoqchimisiz?" icon="trash" class="text-red-600 hover:text-red-700" title="O'chirish" />
                         </td>
                     </tr>
                 @empty

@@ -17,7 +17,17 @@ class TeacherFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'name' => fake()->name(),
+            'phone' => '+998'.fake()->numerify('9########'),
+            'payment_percentage' => fake()->randomElement([30, 35, 40, 45, 50]),
+            'is_active' => true,
         ];
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
     }
 }

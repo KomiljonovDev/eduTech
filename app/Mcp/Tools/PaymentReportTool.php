@@ -80,8 +80,8 @@ class PaymentReportTool extends Tool
 
         $output .= "📊 UMUMIY KO'RSATKICHLAR:\n";
         $output .= str_repeat('─', 40)."\n";
-        $output .= "💵 Jami daromad: ".number_format($totalAmount, 0, '.', ' ')." so'm\n";
-        $output .= "🏫 Maktab ulushi: ".number_format($totalSchoolShare, 0, '.', ' ')." so'm\n";
+        $output .= '💵 Jami daromad: '.number_format($totalAmount, 0, '.', ' ')." so'm\n";
+        $output .= '🏫 Maktab ulushi: '.number_format($totalSchoolShare, 0, '.', ' ')." so'm\n";
         $output .= "👨‍🏫 O'qituvchi to'lovlari: ".number_format($totalTeacherShare, 0, '.', ' ')." so'm\n";
         $output .= "📝 To'lovlar soni: {$payments->count()}\n\n";
 
@@ -124,8 +124,8 @@ class PaymentReportTool extends Tool
 
             foreach ($teacherStats as $stat) {
                 $output .= "• {$stat->name}\n";
-                $output .= "  Jami: ".number_format($stat->total_amount, 0, '.', ' ')." so'm\n";
-                $output .= "  Ulushi: ".number_format($stat->teacher_share, 0, '.', ' ')." so'm\n";
+                $output .= '  Jami: '.number_format($stat->total_amount, 0, '.', ' ')." so'm\n";
+                $output .= '  Ulushi: '.number_format($stat->teacher_share, 0, '.', ' ')." so'm\n";
                 $output .= "  To'lovlar: {$stat->payment_count} ta\n";
             }
             $output .= "\n";
@@ -152,7 +152,7 @@ class PaymentReportTool extends Tool
 
             foreach ($courseStats as $stat) {
                 $output .= "• {$stat->name}\n";
-                $output .= "  Jami: ".number_format($stat->total_amount, 0, '.', ' ')." so'm ({$stat->payment_count} ta)\n";
+                $output .= '  Jami: '.number_format($stat->total_amount, 0, '.', ' ')." so'm ({$stat->payment_count} ta)\n";
             }
             $output .= "\n";
         }

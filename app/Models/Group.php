@@ -58,9 +58,19 @@ class Group extends Model
         return $this->hasMany(Enrollment::class);
     }
 
+    public function activeEnrollments(): HasMany
+    {
+        return $this->enrollments()->where('status', 'active');
+    }
+
     public function students(): HasManyThrough
     {
         return $this->hasManyThrough(Student::class, Enrollment::class, 'group_id', 'id', 'id', 'student_id');
+    }
+
+    public function attendances(): HasManyThrough
+    {
+        return $this->hasManyThrough(Attendance::class, Enrollment::class);
     }
 
     public function getDaysLabelAttribute(): string

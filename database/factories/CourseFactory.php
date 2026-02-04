@@ -16,8 +16,32 @@ class CourseFactory extends Factory
      */
     public function definition(): array
     {
-        return [
-            //
+        $courses = [
+            ['name' => 'Python Dasturlash', 'code' => 'PY'],
+            ['name' => 'JavaScript Asoslari', 'code' => 'JS'],
+            ['name' => 'Web Dizayn', 'code' => 'WD'],
+            ['name' => 'Mobile Dasturlash', 'code' => 'MB'],
+            ['name' => 'Data Science', 'code' => 'DS'],
+            ['name' => 'Cyber Security', 'code' => 'CS'],
+            ['name' => 'Graphic Design', 'code' => 'GD'],
+            ['name' => 'SMM Marketing', 'code' => 'SM'],
         ];
+
+        $course = fake()->randomElement($courses);
+
+        return [
+            'name' => $course['name'],
+            'code' => $course['code'].fake()->unique()->numerify('###'),
+            'description' => fake()->optional()->paragraph(),
+            'monthly_price' => fake()->randomElement([300000, 400000, 500000, 600000, 700000]),
+            'is_active' => true,
+        ];
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
     }
 }

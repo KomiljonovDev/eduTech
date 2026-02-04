@@ -1,0 +1,258 @@
+<?php
+
+namespace App\Livewire\Admin;
+
+use App\Models\Attendance as AttendanceModel;
+use App\Models\Enrollment;
+use App\Models\Group;
+use App\Models\Payment;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+
+#[Layout('layouts::app')]
+class GroupDetail extends Component
+{
+    public Group $group;
+
+    public string $activeTab = 'students';
+
+    // Payment modal
+    public bool $showPaymentModal = false;
+
+    public ?int $paymentEnrollmentId = null;
+
+    public string $amount = '';
+
+    public string $method = 'cash';
+
+    public string $period = '';
+
+    public string $payment_notes = '';
+
+    // Attendance
+    public int $lesson_number = 1;
+
+    public string $lesson_date = '';
+
+    public array $attendance = [];
+
+    public function mount(Group $group): void
+    {
+        $this->group = $group->load(['course', 'teacher', 'room']);
+        $this->lesson_date = now()->format('Y-m-d');
+        $this->period = now()->format('Y-m');
+        $this->loadAttendance();
+    }
+
+    public function getTitle(): string
+    {
+        return $this->group->name.' - '.$this->group->course->code;
+    }
+
+    #[Computed]
+    public function enrollments()
+    {
+        return Enrollment::with(['student.activeDiscounts', 'payments', 'attendances'])
+            ->where('group_id', $this->group->id)
+            ->where('status', 'active')
+            ->get();
+    }
+
+    #[Computed]
+    public function allEnrollments()
+    {
+        return Enrollment::with(['student', 'payments'])
+            ->where('group_id', $this->group->id)
+            ->get();
+    }
+
+    #[Computed]
+    public function paymentEnrollment()
+    {
+        return $this->paymentEnrollmentId
+            ? Enrollment::with(['student.activeDiscounts', 'group.course'])->find($this->paymentEnrollmentId)
+            : null;
+    }
+
+    #[Computed]
+    public function lessonDates()
+    {
+        $existingLessons = AttendanceModel::whereHas('enrollment', fn ($q) => $q->where('group_id', $this->group->id))
+            ->select('lesson_number', 'date')
+            ->distinct()
+            ->orderBy('lesson_number')
+            ->get()
+            ->keyBy('lesson_number');
+
+        $lessons = [];
+        $maxLesson = max($existingLessons->keys()->max() ?? 0, $this->lesson_number);
+
+        for ($i = 1; $i <= max($maxLesson, $this->group->total_lessons ?? 12); $i++) {
+            $lessons[$i] = $existingLessons->has($i)
+                ? $existingLessons[$i]->date->format('d.m.Y')
+                : null;
+        }
+
+        return $lessons;
+    }
+
+    #[Computed]
+    public function existingAttendance()
+    {
+        return AttendanceModel::whereHas('enrollment', fn ($q) => $q->where('group_id', $this->group->id))
+            ->where('lesson_number', $this->lesson_number)
+            ->get()
+            ->keyBy('enrollment_id');
+    }
+
+    public function getPaymentStatusForPeriod(Enrollment $enrollment, ?string $period = null): array
+    {
+        $period = $period ?? $this->period;
+        $coursePrice = $this->group->course->monthly_price;
+        $payments = $enrollment->payments->where('period', $period);
+        $totalPaid = $payments->sum('amount');
+        $discount = $enrollment->student->calculateTotalDiscount($coursePrice);
+        $required = $coursePrice - $discount;
+
+        return [
+            'course_price' => $coursePrice,
+            'discount' => $discount,
+            'required' => $required,
+            'paid' => $totalPaid,
+            'remaining' => max(0, $required - $totalPaid),
+            'status' => $totalPaid >= $required ? 'paid' : ($totalPaid > 0 ? 'partial' : 'unpaid'),
+        ];
+    }
+
+    public function getAttendanceStats(Enrollment $enrollment): array
+    {
+        $total = $enrollment->attendances->count();
+        $present = $enrollment->attendances->where('present', true)->count();
+
+        return [
+            'total' => $total,
+            'present' => $present,
+            'absent' => $total - $present,
+            'percentage' => $total > 0 ? round(($present / $total) * 100) : 0,
+        ];
+    }
+
+    public function getTotalStats(): array
+    {
+        $totalRequired = 0;
+        $totalPaid = 0;
+        $totalDiscount = 0;
+
+        foreach ($this->enrollments as $enrollment) {
+            $status = $this->getPaymentStatusForPeriod($enrollment);
+            $totalRequired += $status['course_price'];
+            $totalPaid += $status['paid'];
+            $totalDiscount += $status['discount'];
+        }
+
+        return [
+            'required' => $totalRequired,
+            'paid' => $totalPaid,
+            'discount' => $totalDiscount,
+            'remaining' => $totalRequired - $totalDiscount - $totalPaid,
+        ];
+    }
+
+    // Payment methods
+    public function openPaymentModal(Enrollment $enrollment): void
+    {
+        $this->paymentEnrollmentId = $enrollment->id;
+        $status = $this->getPaymentStatusForPeriod($enrollment);
+        $this->amount = $status['remaining'] > 0 ? (string) $status['remaining'] : (string) $status['required'];
+        $this->method = 'cash';
+        $this->payment_notes = '';
+        $this->showPaymentModal = true;
+    }
+
+    public function collectPayment(): void
+    {
+        $this->validate([
+            'amount' => 'required|numeric|min:1000',
+            'method' => 'required|in:cash,card,transfer',
+            'period' => 'required|date_format:Y-m',
+        ]);
+
+        Payment::create([
+            'enrollment_id' => $this->paymentEnrollmentId,
+            'amount' => $this->amount,
+            'paid_at' => now(),
+            'period' => $this->period,
+            'method' => $this->method,
+            'notes' => $this->payment_notes ?: null,
+        ]);
+
+        $this->showPaymentModal = false;
+        $this->reset(['paymentEnrollmentId', 'amount', 'payment_notes']);
+        $this->dispatch('payment-collected');
+    }
+
+    // Attendance methods
+    public function updatedLessonNumber(): void
+    {
+        $this->loadAttendance();
+    }
+
+    public function loadAttendance(): void
+    {
+        $this->attendance = [];
+
+        foreach ($this->enrollments as $enrollment) {
+            $existing = $this->existingAttendance->get($enrollment->id);
+            $this->attendance[$enrollment->id] = $existing ? $existing->present : false;
+        }
+
+        $existingRecord = $this->existingAttendance->first();
+        if ($existingRecord) {
+            $this->lesson_date = $existingRecord->date->format('Y-m-d');
+        }
+    }
+
+    public function saveAttendance(): void
+    {
+        foreach ($this->enrollments as $enrollment) {
+            AttendanceModel::updateOrCreate(
+                [
+                    'enrollment_id' => $enrollment->id,
+                    'lesson_number' => $this->lesson_number,
+                ],
+                [
+                    'date' => $this->lesson_date,
+                    'present' => $this->attendance[$enrollment->id] ?? false,
+                ]
+            );
+        }
+
+        $this->dispatch('attendance-saved');
+    }
+
+    public function toggleAttendance(int $enrollmentId): void
+    {
+        $this->attendance[$enrollmentId] = ! ($this->attendance[$enrollmentId] ?? false);
+    }
+
+    public function markAllPresent(): void
+    {
+        foreach ($this->enrollments as $enrollment) {
+            $this->attendance[$enrollment->id] = true;
+        }
+    }
+
+    public function markAllAbsent(): void
+    {
+        foreach ($this->enrollments as $enrollment) {
+            $this->attendance[$enrollment->id] = false;
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.admin.group-detail')
+            ->title($this->getTitle());
+    }
+}

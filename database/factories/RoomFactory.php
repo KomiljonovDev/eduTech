@@ -17,7 +17,16 @@ class RoomFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'name' => 'Xona '.fake()->unique()->numberBetween(1, 20),
+            'capacity' => fake()->numberBetween(10, 30),
+            'is_active' => true,
         ];
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
     }
 }

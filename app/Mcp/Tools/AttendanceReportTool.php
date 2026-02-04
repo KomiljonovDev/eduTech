@@ -198,12 +198,12 @@ class AttendanceReportTool extends Tool
         $output = "📊 UMUMIY DAVOMAT HISOBOTI\n\n";
 
         if ($dateFrom || $dateTo) {
-            $output .= "📅 Davr: ".($dateFrom ?? '...').'-'.($dateTo ?? '...')."\n\n";
+            $output .= '📅 Davr: '.($dateFrom ?? '...').'-'.($dateTo ?? '...')."\n\n";
         }
 
         $output .= "📈 UMUMIY STATISTIKA:\n";
         $output .= "  ✅ Qatnashgan: {$presentCount}\n";
-        $output .= "  ❌ Qatnashmagan: ".($totalRecords - $presentCount)."\n";
+        $output .= '  ❌ Qatnashmagan: '.($totalRecords - $presentCount)."\n";
         $output .= "  📊 Davomat darajasi: {$attendanceRate}%\n\n";
 
         if ($groupStats->isNotEmpty()) {
