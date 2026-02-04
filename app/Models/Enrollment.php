@@ -17,6 +17,9 @@ class Enrollment extends Model
         'group_id',
         'enrolled_at',
         'status',
+        'dropped_at',
+        'final_balance',
+        'drop_reason',
         'notes',
     ];
 
@@ -24,6 +27,8 @@ class Enrollment extends Model
     {
         return [
             'enrolled_at' => 'date',
+            'dropped_at' => 'date',
+            'final_balance' => 'decimal:2',
         ];
     }
 

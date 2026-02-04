@@ -6,6 +6,7 @@ use App\Models\Attendance as AttendanceModel;
 use App\Models\Enrollment;
 use App\Models\Group;
 use App\Models\Payment;
+use App\Models\Student;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -29,6 +30,13 @@ class GroupDetail extends Component
     public string $period = '';
 
     public string $payment_notes = '';
+
+    // Add student modal
+    public bool $showAddStudentModal = false;
+
+    public string $student_id = '';
+
+    public string $studentSearch = '';
 
     // Attendance
     public int $lesson_number = 1;
@@ -104,6 +112,25 @@ class GroupDetail extends Component
             ->where('lesson_number', $this->lesson_number)
             ->get()
             ->keyBy('enrollment_id');
+    }
+
+    #[Computed]
+    public function availableStudents()
+    {
+        $enrolledStudentIds = $this->group->enrollments()
+            ->whereIn('status', ['active', 'paused'])
+            ->pluck('student_id');
+
+        $query = Student::whereNotIn('id', $enrolledStudentIds);
+
+        if ($this->studentSearch) {
+            $query->where(function ($q) {
+                $q->where('name', 'like', "%{$this->studentSearch}%")
+                    ->orWhere('phone', 'like', "%{$this->studentSearch}%");
+            });
+        }
+
+        return $query->limit(20)->get();
     }
 
     public function getPaymentStatusForPeriod(Enrollment $enrollment, ?string $period = null): array
@@ -248,6 +275,89 @@ class GroupDetail extends Component
         foreach ($this->enrollments as $enrollment) {
             $this->attendance[$enrollment->id] = false;
         }
+    }
+
+    // Student management methods
+    public function openAddStudentModal(): void
+    {
+        $this->student_id = '';
+        $this->studentSearch = '';
+        $this->showAddStudentModal = true;
+    }
+
+    public function updatedStudentSearch(): void
+    {
+        unset($this->availableStudents);
+    }
+
+    public function addStudent(): void
+    {
+        $this->validate([
+            'student_id' => 'required|exists:students,id',
+        ]);
+
+        $exists = Enrollment::where('student_id', $this->student_id)
+            ->where('group_id', $this->group->id)
+            ->whereIn('status', ['active', 'paused'])
+            ->exists();
+
+        if ($exists) {
+            $this->addError('student_id', "Bu o'quvchi allaqachon ushbu guruhda");
+
+            return;
+        }
+
+        Enrollment::create([
+            'student_id' => $this->student_id,
+            'group_id' => $this->group->id,
+            'enrolled_at' => now(),
+            'status' => 'active',
+        ]);
+
+        $this->showAddStudentModal = false;
+        $this->reset(['student_id', 'studentSearch']);
+        $this->dispatch('student-added');
+    }
+
+    public function addStudentDirect(int $studentId): void
+    {
+        $exists = Enrollment::where('student_id', $studentId)
+            ->where('group_id', $this->group->id)
+            ->whereIn('status', ['active', 'paused'])
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        Enrollment::create([
+            'student_id' => $studentId,
+            'group_id' => $this->group->id,
+            'enrolled_at' => now(),
+            'status' => 'active',
+        ]);
+
+        $this->dispatch('student-added');
+    }
+
+    public function unenrollStudent(Enrollment $enrollment): void
+    {
+        // Joriy oydagi qarzdorlikni hisoblash
+        $enrollment->load(['student.activeDiscounts', 'group.course', 'payments']);
+        $currentPeriod = now()->format('Y-m');
+        $coursePrice = $enrollment->group->course->monthly_price;
+        $discount = $enrollment->student->calculateTotalDiscount($coursePrice);
+        $required = $coursePrice - $discount;
+        $paid = $enrollment->payments->where('period', $currentPeriod)->sum('amount');
+        $remaining = max(0, $required - $paid);
+
+        $enrollment->update([
+            'status' => 'dropped',
+            'dropped_at' => now(),
+            'final_balance' => $remaining,
+        ]);
+
+        $this->dispatch('student-removed');
     }
 
     public function render()

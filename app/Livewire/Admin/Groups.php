@@ -9,6 +9,7 @@ use App\Models\Teacher;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts::app')]
@@ -38,6 +39,25 @@ class Groups extends Component
     public string $start_date = '';
 
     public string $status = 'pending';
+
+    // Filters
+    #[Url]
+    public string $filterCourse = '';
+
+    #[Url]
+    public string $filterTeacher = '';
+
+    #[Url]
+    public string $filterDays = '';
+
+    #[Url]
+    public string $filterStatus = '';
+
+    #[Url]
+    public string $filterRoom = '';
+
+    #[Url]
+    public string $search = '';
 
     protected function rules(): array
     {
@@ -130,13 +150,42 @@ class Groups extends Component
         $group->delete();
     }
 
+    public function clearFilters(): void
+    {
+        $this->reset(['filterCourse', 'filterTeacher', 'filterDays', 'filterStatus', 'filterRoom', 'search']);
+    }
+
     public function render()
     {
+        $query = Group::with(['course', 'teacher', 'room'])
+            ->withCount(['enrollments', 'enrollments as active_enrollments_count' => fn ($q) => $q->where('status', 'active')]);
+
+        if ($this->search) {
+            $query->where('name', 'like', "%{$this->search}%");
+        }
+
+        if ($this->filterCourse) {
+            $query->where('course_id', $this->filterCourse);
+        }
+
+        if ($this->filterTeacher) {
+            $query->where('teacher_id', $this->filterTeacher);
+        }
+
+        if ($this->filterDays) {
+            $query->where('days', $this->filterDays);
+        }
+
+        if ($this->filterStatus) {
+            $query->where('status', $this->filterStatus);
+        }
+
+        if ($this->filterRoom) {
+            $query->where('room_id', $this->filterRoom);
+        }
+
         return view('livewire.admin.groups', [
-            'groups' => Group::with(['course', 'teacher', 'room'])
-                ->withCount('enrollments')
-                ->latest()
-                ->get(),
+            'groups' => $query->latest()->get(),
         ]);
     }
 }

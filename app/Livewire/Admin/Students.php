@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Jobs\SendSms;
 use App\Models\Discount;
 use App\Models\Enrollment;
 use App\Models\Group;
@@ -25,6 +26,10 @@ class Students extends Component
 
     public bool $showDiscountModal = false;
 
+    public bool $showBulkSmsModal = false;
+
+    public bool $showBulkEnrollModal = false;
+
     public ?int $editingId = null;
 
     public ?int $enrollingStudentId = null;
@@ -37,6 +42,9 @@ class Students extends Component
 
     public string $home_phone = '';
 
+    /** @var array<int, array{number: string, owner: string}> */
+    public array $phones = [];
+
     public string $address = '';
 
     public string $source = 'walk_in';
@@ -46,6 +54,15 @@ class Students extends Component
     public string $group_id = '';
 
     public string $discount_id = '';
+
+    /** @var array<int> */
+    public array $selected = [];
+
+    public bool $selectAll = false;
+
+    public string $bulkSmsMessage = '';
+
+    public string $bulkGroupId = '';
 
     #[Url]
     public string $search = '';
@@ -59,6 +76,9 @@ class Students extends Component
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
             'home_phone' => 'nullable|string|max:20',
+            'phones' => 'nullable|array|max:4',
+            'phones.*.number' => 'nullable|string|max:20',
+            'phones.*.owner' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:255',
             'source' => 'required|in:instagram,telegram,referral,walk_in,grand,other',
             'notes' => 'nullable|string',
@@ -89,7 +109,7 @@ class Students extends Component
 
     public function create(): void
     {
-        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'address', 'source', 'notes']);
+        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'phones', 'address', 'source', 'notes']);
         $this->source = 'walk_in';
         $this->showModal = true;
     }
@@ -100,17 +120,31 @@ class Students extends Component
         $this->name = $student->name;
         $this->phone = $student->phone;
         $this->home_phone = $student->home_phone ?? '';
+        $this->phones = $student->phones->map(fn ($p) => ['number' => $p->number, 'owner' => $p->owner ?? ''])->toArray();
         $this->address = $student->address ?? '';
         $this->source = $student->source;
         $this->notes = $student->notes ?? '';
         $this->showModal = true;
     }
 
+    public function addPhone(): void
+    {
+        if (count($this->phones) < 4) {
+            $this->phones[] = ['number' => '', 'owner' => ''];
+        }
+    }
+
+    public function removePhone(int $index): void
+    {
+        unset($this->phones[$index]);
+        $this->phones = array_values($this->phones);
+    }
+
     public function save(): void
     {
         $this->validate();
 
-        Student::updateOrCreate(
+        $student = Student::updateOrCreate(
             ['id' => $this->editingId],
             [
                 'name' => $this->name,
@@ -122,8 +156,19 @@ class Students extends Component
             ]
         );
 
+        // Sync phones
+        $student->phones()->delete();
+        foreach ($this->phones as $phone) {
+            if (! empty($phone['number'])) {
+                $student->phones()->create([
+                    'number' => $phone['number'],
+                    'owner' => $phone['owner'] ?: null,
+                ]);
+            }
+        }
+
         $this->showModal = false;
-        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'address', 'source', 'notes']);
+        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'phones', 'address', 'source', 'notes']);
     }
 
     public function delete(Student $student): void
@@ -202,13 +247,124 @@ class Students extends Component
         $student->discounts()->detach($discountId);
     }
 
-    public function render()
+    public function updatedSelectAll(bool $value): void
+    {
+        if ($value) {
+            $this->selected = $this->getStudentsQuery()->pluck('id')->toArray();
+        } else {
+            $this->selected = [];
+        }
+    }
+
+    public function updatedSelected(): void
+    {
+        $this->selectAll = false;
+    }
+
+    #[Computed]
+    public function selectedCount(): int
+    {
+        return count($this->selected);
+    }
+
+    public function openBulkSmsModal(): void
+    {
+        if (empty($this->selected)) {
+            return;
+        }
+
+        $this->bulkSmsMessage = '';
+        $this->showBulkSmsModal = true;
+    }
+
+    public function sendBulkSms(): void
+    {
+        $this->validate([
+            'bulkSmsMessage' => 'required|string|min:3|max:500',
+        ]);
+
+        $students = Student::whereIn('id', $this->selected)->get();
+
+        foreach ($students as $student) {
+            SendSms::dispatch($student->phone, $this->bulkSmsMessage);
+        }
+
+        $this->showBulkSmsModal = false;
+        $this->bulkSmsMessage = '';
+        $this->selected = [];
+        $this->selectAll = false;
+
+        session()->flash('message', count($students)." ta o'quvchiga SMS yuborildi (navbatga qo'shildi)");
+    }
+
+    public function openBulkEnrollModal(): void
+    {
+        if (empty($this->selected)) {
+            return;
+        }
+
+        $this->bulkGroupId = '';
+        $this->showBulkEnrollModal = true;
+    }
+
+    public function bulkEnroll(): void
+    {
+        $this->validate([
+            'bulkGroupId' => 'required|exists:groups,id',
+        ]);
+
+        $students = Student::whereIn('id', $this->selected)->get();
+        $group = Group::find($this->bulkGroupId);
+        $enrolled = 0;
+        $skipped = 0;
+
+        foreach ($students as $student) {
+            $exists = Enrollment::where('student_id', $student->id)
+                ->where('group_id', $group->id)
+                ->exists();
+
+            if ($exists) {
+                $skipped++;
+
+                continue;
+            }
+
+            Enrollment::create([
+                'student_id' => $student->id,
+                'group_id' => $group->id,
+                'enrolled_at' => now(),
+                'status' => 'active',
+            ]);
+
+            $enrolled++;
+        }
+
+        $this->showBulkEnrollModal = false;
+        $this->bulkGroupId = '';
+        $this->selected = [];
+        $this->selectAll = false;
+
+        $message = "{$enrolled} ta o'quvchi guruhga qo'shildi";
+        if ($skipped > 0) {
+            $message .= " ({$skipped} tasi allaqachon guruhda)";
+        }
+
+        session()->flash('message', $message);
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selected = [];
+        $this->selectAll = false;
+    }
+
+    protected function getStudentsQuery()
     {
         $query = Student::query()
             ->withCount(['enrollments', 'enrollments as active_enrollments_count' => function ($q) {
                 $q->where('status', 'active');
             }, 'discounts'])
-            ->with(['enrollments.group.course', 'discounts']);
+            ->with(['enrollments.group.course', 'discounts', 'phones']);
 
         if ($this->search) {
             $query->where(function ($q) {
@@ -234,8 +390,13 @@ class Students extends Component
             });
         }
 
+        return $query;
+    }
+
+    public function render()
+    {
         return view('livewire.admin.students', [
-            'students' => $query->latest()->paginate(20),
+            'students' => $this->getStudentsQuery()->latest()->paginate(20),
             'sources' => [
                 'instagram' => 'Instagram',
                 'telegram' => 'Telegram',

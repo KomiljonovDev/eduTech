@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Student extends Model
 {
@@ -28,6 +29,35 @@ class Student extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    public function phones(): MorphMany
+    {
+        return $this->morphMany(Phone::class, 'phoneable');
+    }
+
+    /**
+     * Get all phone numbers with their owners.
+     *
+     * @return array<int, array{number: string, owner: string|null}>
+     */
+    public function getAllPhones(): array
+    {
+        $phones = [];
+
+        if ($this->phone) {
+            $phones[] = ['number' => $this->phone, 'owner' => null];
+        }
+
+        if ($this->home_phone) {
+            $phones[] = ['number' => $this->home_phone, 'owner' => 'Uy'];
+        }
+
+        foreach ($this->phones as $phone) {
+            $phones[] = ['number' => $phone->number, 'owner' => $phone->owner];
+        }
+
+        return $phones;
     }
 
     public function enrollments(): HasMany

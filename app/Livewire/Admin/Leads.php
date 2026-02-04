@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\Course;
 use App\Models\Lead;
+use App\Models\LeadActivity;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -27,6 +28,9 @@ class Leads extends Component
 
     public string $home_phone = '';
 
+    /** @var array<int, array{number: string, owner: string}> */
+    public array $phones = [];
+
     public string $course_id = '';
 
     public string $source = 'instagram';
@@ -46,12 +50,38 @@ class Leads extends Component
     #[Url]
     public string $filterCourse = 'all';
 
+    #[Url]
+    public string $filterNextContact = 'all';
+
+    // Activity Modal
+    public bool $showActivityModal = false;
+
+    public ?int $activityLeadId = null;
+
+    public string $activityOutcome = 'answered';
+
+    public string $activityNotes = '';
+
+    public string $activityNextContactDate = '';
+
+    public string $activityPhoneCalled = '';
+
+    public string $activityPhoneOwner = '';
+
+    // Detail Modal
+    public bool $showDetailModal = false;
+
+    public ?int $detailLeadId = null;
+
     protected function rules(): array
     {
         return [
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
             'home_phone' => 'nullable|string|max:20',
+            'phones' => 'nullable|array|max:4',
+            'phones.*.number' => 'nullable|string|max:20',
+            'phones.*.owner' => 'nullable|string|max:50',
             'course_id' => 'nullable|exists:courses,id',
             'source' => 'required|in:instagram,telegram,google_form,referral,walk_in,other',
             'status' => 'required|in:new,contacted,interested,enrolled,not_interested,no_answer',
@@ -66,9 +96,43 @@ class Leads extends Component
         return Course::where('is_active', true)->get();
     }
 
+    #[Computed]
+    public function detailLead(): ?Lead
+    {
+        if (! $this->detailLeadId) {
+            return null;
+        }
+
+        return Lead::with(['activities.user', 'course', 'phones'])->find($this->detailLeadId);
+    }
+
+    #[Computed]
+    public function outcomeLabels(): array
+    {
+        return LeadActivity::getOutcomeLabels();
+    }
+
+    #[Computed]
+    public function outcomeColors(): array
+    {
+        return LeadActivity::getOutcomeColors();
+    }
+
+    #[Computed]
+    public function activityLeadPhones(): array
+    {
+        if (! $this->activityLeadId) {
+            return [];
+        }
+
+        $lead = Lead::with('phones')->find($this->activityLeadId);
+
+        return $lead ? $lead->getAllPhones() : [];
+    }
+
     public function create(): void
     {
-        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'course_id', 'source', 'status', 'preferred_time', 'notes']);
+        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'phones', 'course_id', 'source', 'status', 'preferred_time', 'notes']);
         $this->source = 'instagram';
         $this->status = 'new';
         $this->showModal = true;
@@ -80,12 +144,26 @@ class Leads extends Component
         $this->name = $lead->name;
         $this->phone = $lead->phone;
         $this->home_phone = $lead->home_phone ?? '';
+        $this->phones = $lead->phones->map(fn ($p) => ['number' => $p->number, 'owner' => $p->owner ?? ''])->toArray();
         $this->course_id = (string) ($lead->course_id ?? '');
         $this->source = $lead->source;
         $this->status = $lead->status;
         $this->preferred_time = $lead->preferred_time ?? '';
         $this->notes = $lead->notes ?? '';
         $this->showModal = true;
+    }
+
+    public function addPhone(): void
+    {
+        if (count($this->phones) < 4) {
+            $this->phones[] = ['number' => '', 'owner' => ''];
+        }
+    }
+
+    public function removePhone(int $index): void
+    {
+        unset($this->phones[$index]);
+        $this->phones = array_values($this->phones);
     }
 
     public function save(): void
@@ -107,10 +185,21 @@ class Leads extends Component
             $data['contacted_at'] = now();
         }
 
-        Lead::updateOrCreate(['id' => $this->editingId], $data);
+        $lead = Lead::updateOrCreate(['id' => $this->editingId], $data);
+
+        // Sync phones
+        $lead->phones()->delete();
+        foreach ($this->phones as $phone) {
+            if (! empty($phone['number'])) {
+                $lead->phones()->create([
+                    'number' => $phone['number'],
+                    'owner' => $phone['owner'] ?: null,
+                ]);
+            }
+        }
 
         $this->showModal = false;
-        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'course_id', 'source', 'status', 'preferred_time', 'notes']);
+        $this->reset(['editingId', 'name', 'phone', 'home_phone', 'phones', 'course_id', 'source', 'status', 'preferred_time', 'notes']);
     }
 
     public function markContacted(Lead $lead): void
@@ -133,9 +222,69 @@ class Leads extends Component
         $lead->delete();
     }
 
+    public function openActivityModal(Lead $lead): void
+    {
+        $this->activityLeadId = $lead->id;
+        $this->activityOutcome = 'answered';
+        $this->activityNotes = '';
+        $this->activityNextContactDate = '';
+
+        // Set first phone as default
+        $phones = $lead->getAllPhones();
+        $this->activityPhoneCalled = $phones[0]['number'] ?? '';
+        $this->activityPhoneOwner = $phones[0]['owner'] ?? '';
+
+        $this->showActivityModal = true;
+    }
+
+    public function saveActivity(): void
+    {
+        $this->validate([
+            'activityOutcome' => 'required|in:answered,no_answer,busy,callback_requested,interested,not_interested,enrolled,other',
+            'activityNotes' => 'nullable|string',
+            'activityNextContactDate' => 'nullable|date',
+            'activityPhoneCalled' => 'nullable|string|max:20',
+            'activityPhoneOwner' => 'nullable|string|max:50',
+        ]);
+
+        $lead = Lead::findOrFail($this->activityLeadId);
+
+        $lead->logActivity(
+            $this->activityOutcome,
+            $this->activityNotes ?: null,
+            $this->activityNextContactDate ?: null,
+            $this->activityPhoneCalled ?: null,
+            $this->activityPhoneOwner ?: null
+        );
+
+        // Update lead status based on outcome
+        $statusMapping = [
+            'answered' => 'contacted',
+            'no_answer' => 'no_answer',
+            'busy' => 'contacted',
+            'callback_requested' => 'contacted',
+            'interested' => 'interested',
+            'not_interested' => 'not_interested',
+            'enrolled' => 'enrolled',
+        ];
+
+        if (isset($statusMapping[$this->activityOutcome])) {
+            $lead->update(['status' => $statusMapping[$this->activityOutcome]]);
+        }
+
+        $this->showActivityModal = false;
+        $this->reset(['activityLeadId', 'activityOutcome', 'activityNotes', 'activityNextContactDate', 'activityPhoneCalled', 'activityPhoneOwner']);
+    }
+
+    public function openDetailModal(Lead $lead): void
+    {
+        $this->detailLeadId = $lead->id;
+        $this->showDetailModal = true;
+    }
+
     public function render()
     {
-        $query = Lead::query()->with('course');
+        $query = Lead::query()->with(['course', 'phones'])->withCount('activities');
 
         if ($this->search) {
             $query->where(function ($q) {
@@ -151,6 +300,20 @@ class Leads extends Component
         if ($this->filterCourse !== 'all') {
             $query->where('course_id', $this->filterCourse);
         }
+
+        if ($this->filterNextContact !== 'all') {
+            $today = now()->toDateString();
+            if ($this->filterNextContact === 'today') {
+                $query->whereDate('next_contact_date', $today);
+            } elseif ($this->filterNextContact === 'overdue') {
+                $query->whereDate('next_contact_date', '<', $today);
+            } elseif ($this->filterNextContact === 'upcoming') {
+                $query->whereDate('next_contact_date', '>', $today);
+            }
+        }
+
+        $todayFollowUpCount = Lead::query()->whereDate('next_contact_date', now()->toDateString())->count();
+        $overdueCount = Lead::query()->whereDate('next_contact_date', '<', now()->toDateString())->count();
 
         return view('livewire.admin.leads', [
             'leads' => $query->latest()->paginate(20),
@@ -170,6 +333,8 @@ class Leads extends Component
                 'walk_in' => "O'zi kelgan",
                 'other' => 'Boshqa',
             ],
+            'todayFollowUpCount' => $todayFollowUpCount,
+            'overdueCount' => $overdueCount,
         ]);
     }
 }

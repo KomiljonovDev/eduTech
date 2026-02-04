@@ -9,6 +9,40 @@
         </flux:button>
     </div>
 
+    {{-- Flash Message --}}
+    @if (session('message'))
+        <flux:callout color="green" icon="check-circle" dismissible>
+            <flux:callout.text>{{ session('message') }}</flux:callout.text>
+        </flux:callout>
+    @endif
+
+    {{-- Bulk Actions Toolbar --}}
+    @if ($this->selectedCount > 0)
+        <div class="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+            <div class="flex items-center gap-3">
+                <flux:badge color="blue" size="lg">{{ $this->selectedCount }} ta tanlangan</flux:badge>
+                <flux:button variant="ghost" size="sm" wire:click="clearSelection" icon="x-mark">
+                    Bekor qilish
+                </flux:button>
+            </div>
+            <div class="flex items-center gap-2">
+                <flux:dropdown>
+                    <flux:button variant="primary" icon-trailing="chevron-down">
+                        Amallar
+                    </flux:button>
+                    <flux:menu>
+                        <flux:menu.item wire:click="openBulkSmsModal" icon="chat-bubble-left">
+                            SMS yuborish
+                        </flux:menu.item>
+                        <flux:menu.item wire:click="openBulkEnrollModal" icon="user-plus">
+                            Guruhga qo'shish
+                        </flux:menu.item>
+                    </flux:menu>
+                </flux:dropdown>
+            </div>
+        </div>
+    @endif
+
     {{-- Filters --}}
     <div class="flex flex-wrap items-center gap-4">
         <div class="flex-1">
@@ -53,6 +87,9 @@
         <table class="w-full text-sm">
             <thead class="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800">
                 <tr>
+                    <th class="w-12 px-4 py-3">
+                        <flux:checkbox wire:model.live="selectAll" />
+                    </th>
                     <th class="px-4 py-3 text-left font-medium">O'quvchi</th>
                     <th class="px-4 py-3 text-left font-medium">Telefon</th>
                     <th class="px-4 py-3 text-left font-medium">Manba</th>
@@ -63,7 +100,10 @@
             </thead>
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @forelse ($students as $student)
-                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 {{ in_array($student->id, $selected) ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
+                        <td class="px-4 py-3">
+                            <flux:checkbox wire:model.live="selected" value="{{ $student->id }}" />
+                        </td>
                         <td class="px-4 py-3">
                             <div class="font-medium">{{ $student->name }}</div>
                             @if ($student->address)
@@ -73,8 +113,16 @@
                         <td class="px-4 py-3">
                             <div>{{ $student->phone }}</div>
                             @if ($student->home_phone)
-                                <div class="text-xs text-zinc-500">{{ $student->home_phone }}</div>
+                                <div class="text-xs text-zinc-500">{{ $student->home_phone }} (Uy)</div>
                             @endif
+                            @foreach ($student->phones as $extraPhone)
+                                <div class="text-xs text-zinc-500">
+                                    {{ $extraPhone->number }}
+                                    @if ($extraPhone->owner)
+                                        ({{ $extraPhone->owner }})
+                                    @endif
+                                </div>
+                            @endforeach
                         </td>
                         <td class="px-4 py-3">
                             <flux:badge size="sm" color="zinc">{{ $sources[$student->source] ?? $student->source }}</flux:badge>
@@ -116,7 +164,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-zinc-500">
+                        <td colspan="7" class="px-4 py-8 text-center text-zinc-500">
                             O'quvchilar topilmadi
                         </td>
                     </tr>
@@ -141,9 +189,35 @@
             <flux:input wire:model="name" label="F.I.O" placeholder="Ism Familiya" required />
 
             <div class="grid grid-cols-2 gap-4">
-                <flux:input wire:model="phone" label="Telefon" placeholder="+998 90 123 45 67" required />
-                <flux:input wire:model="home_phone" label="Uy telefoni" placeholder="+998 90 123 45 67" />
+                <x-phone-input wire:model="phone" label="Asosiy telefon" required />
+                <x-phone-input wire:model="home_phone" label="Uy telefoni" />
             </div>
+
+            {{-- Additional Phones --}}
+            @if (count($phones) > 0)
+                <div class="space-y-3">
+                    <flux:text class="text-sm font-medium">Qo'shimcha telefonlar</flux:text>
+                    @foreach ($phones as $index => $phoneItem)
+                        <div class="grid grid-cols-12 items-end gap-2">
+                            <div class="col-span-6">
+                                <x-phone-input wire:model="phones.{{ $index }}.number" />
+                            </div>
+                            <div class="col-span-5">
+                                <flux:input wire:model="phones.{{ $index }}.owner" placeholder="Egasi (ixtiyoriy)" />
+                            </div>
+                            <div class="col-span-1 pb-2">
+                                <flux:button variant="ghost" size="sm" wire:click="removePhone({{ $index }})" icon="x-mark" class="text-red-600" />
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            @if (count($phones) < 4)
+                <flux:button variant="ghost" size="sm" wire:click="addPhone" icon="plus" class="text-blue-600">
+                    Telefon qo'shish
+                </flux:button>
+            @endif
 
             <flux:input wire:model="address" label="Manzil" placeholder="Tuman, mahalla..." />
 
@@ -263,5 +337,81 @@
                 </flux:modal.close>
             </div>
         </div>
+    </flux:modal>
+
+    {{-- Bulk SMS Modal --}}
+    <flux:modal wire:model="showBulkSmsModal" class="max-w-lg">
+        <form wire:submit="sendBulkSms" class="space-y-6">
+            <div>
+                <flux:heading size="lg">SMS yuborish</flux:heading>
+                <flux:subheading>{{ $this->selectedCount }} ta o'quvchiga SMS yuboriladi</flux:subheading>
+            </div>
+
+            <flux:textarea
+                wire:model="bulkSmsMessage"
+                label="Xabar matni"
+                placeholder="SMS xabarini yozing..."
+                rows="4"
+                required
+            />
+
+            @error('bulkSmsMessage')
+                <flux:text class="text-sm text-red-600">{{ $message }}</flux:text>
+            @enderror
+
+            <flux:callout color="amber" icon="exclamation-triangle">
+                <flux:callout.text>
+                    SMS navbatga qo'shiladi va ketma-ket yuboriladi. Test rejimida faqat "Bu Eskiz dan test" matni ishlaydi.
+                </flux:callout.text>
+            </flux:callout>
+
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Bekor qilish</flux:button>
+                </flux:modal.close>
+                <flux:button variant="primary" type="submit" icon="paper-airplane">
+                    Yuborish
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    {{-- Bulk Enroll Modal --}}
+    <flux:modal wire:model="showBulkEnrollModal" class="max-w-lg">
+        <form wire:submit="bulkEnroll" class="space-y-6">
+            <div>
+                <flux:heading size="lg">Guruhga qo'shish</flux:heading>
+                <flux:subheading>{{ $this->selectedCount }} ta o'quvchini guruhga qo'shish</flux:subheading>
+            </div>
+
+            <flux:select wire:model="bulkGroupId" label="Guruhni tanlang" required>
+                <flux:select.option value="">Tanlang...</flux:select.option>
+                @foreach ($this->availableGroups as $group)
+                    <flux:select.option value="{{ $group->id }}">
+                        {{ $group->course->code }} | {{ $group->name }} | {{ $group->teacher->name }} | {{ $group->days_label }} ({{ $group->enrollments_count }}/{{ $group->room->capacity }})
+                    </flux:select.option>
+                @endforeach
+            </flux:select>
+
+            @error('bulkGroupId')
+                <flux:text class="text-sm text-red-600">{{ $message }}</flux:text>
+            @enderror
+
+            @if ($this->availableGroups->isEmpty())
+                <flux:callout color="amber" icon="exclamation-triangle">
+                    <flux:callout.heading>Bo'sh guruh yo'q</flux:callout.heading>
+                    <flux:callout.text>Hozirda o'quvchi qo'shish mumkin bo'lgan guruhlar mavjud emas.</flux:callout.text>
+                </flux:callout>
+            @endif
+
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Bekor qilish</flux:button>
+                </flux:modal.close>
+                <flux:button variant="primary" type="submit" icon="user-plus" :disabled="$this->availableGroups->isEmpty()">
+                    Guruhga qo'shish
+                </flux:button>
+            </div>
+        </form>
     </flux:modal>
 </div>

@@ -3,9 +3,12 @@
 use App\Livewire\Admin\Attendance;
 use App\Livewire\Admin\Courses;
 use App\Livewire\Admin\Discounts;
+use App\Livewire\Admin\Expenses;
 use App\Livewire\Admin\GroupDetail;
 use App\Livewire\Admin\Groups;
 use App\Livewire\Admin\Leads;
+use App\Livewire\Admin\LeadShow;
+use App\Livewire\Admin\Reports;
 use App\Livewire\Admin\Rooms;
 use App\Livewire\Admin\Students;
 use App\Livewire\Admin\Teachers;
@@ -19,6 +22,9 @@ Route::middleware(['auth', 'verified', 'role:manager'])->prefix('admin')->name('
     Route::get('/groups/{group}', GroupDetail::class)->name('groups.show');
     Route::get('/students', Students::class)->name('students');
     Route::get('/leads', Leads::class)->name('leads');
+    Route::get('/leads/{lead}', LeadShow::class)->name('leads.show');
     Route::get('/discounts', Discounts::class)->name('discounts');
     Route::get('/attendance', Attendance::class)->name('attendance');
+    Route::get('/expenses', Expenses::class)->name('expenses');
+    Route::get('/reports', Reports::class)->name('reports');
 });

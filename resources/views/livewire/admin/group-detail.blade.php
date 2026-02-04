@@ -65,24 +65,31 @@
     {{-- Students Tab --}}
     @if ($activeTab === 'students')
         <div class="space-y-4">
-            {{-- Period selector --}}
-            <div class="flex items-center gap-4">
-                <flux:input type="month" wire:model.live="period" label="Davr" class="w-48" />
-                @php $stats = $this->getTotalStats(); @endphp
-                <div class="flex gap-4 text-sm">
-                    <div>
-                        <span class="text-zinc-500">Jami:</span>
-                        <span class="font-medium">{{ number_format($stats['required'] - $stats['discount'], 0, '', ' ') }}</span>
-                    </div>
-                    <div>
-                        <span class="text-green-600">To'langan:</span>
-                        <span class="font-medium text-green-600">{{ number_format($stats['paid'], 0, '', ' ') }}</span>
-                    </div>
-                    <div>
-                        <span class="text-red-600">Qoldi:</span>
-                        <span class="font-medium text-red-600">{{ number_format($stats['remaining'], 0, '', ' ') }}</span>
+            {{-- Period selector and Add button --}}
+            <div class="flex flex-wrap items-end justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <flux:input type="month" wire:model.live="period" label="Davr" class="w-48" />
+                    @php $stats = $this->getTotalStats(); @endphp
+                    <div class="flex gap-4 text-sm">
+                        <div>
+                            <span class="text-zinc-500">Jami:</span>
+                            <span class="font-medium">{{ number_format($stats['required'] - $stats['discount'], 0, '', ' ') }}</span>
+                        </div>
+                        <div>
+                            <span class="text-green-600">To'langan:</span>
+                            <span class="font-medium text-green-600">{{ number_format($stats['paid'], 0, '', ' ') }}</span>
+                        </div>
+                        <div>
+                            <span class="text-red-600">Qoldi:</span>
+                            <span class="font-medium text-red-600">{{ number_format($stats['remaining'], 0, '', ' ') }}</span>
+                        </div>
                     </div>
                 </div>
+                @if ($this->enrollments->count() < $group->room->capacity)
+                    <flux:button variant="primary" wire:click="openAddStudentModal" icon="user-plus">
+                        O'quvchi qo'shish
+                    </flux:button>
+                @endif
             </div>
 
             {{-- Students Table --}}
@@ -147,15 +154,24 @@
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    @if ($paymentStatus['status'] !== 'paid')
-                                        <flux:button variant="primary" size="sm" wire:click="openPaymentModal({{ $enrollment->id }})" icon="banknotes">
-                                            To'lov
-                                        </flux:button>
-                                    @else
-                                        <flux:button variant="ghost" size="sm" wire:click="openPaymentModal({{ $enrollment->id }})" icon="plus">
-                                            Qo'shimcha
-                                        </flux:button>
-                                    @endif
+                                    <div class="flex items-center justify-end gap-1">
+                                        @if ($paymentStatus['status'] !== 'paid')
+                                            <flux:button variant="primary" size="sm" wire:click="openPaymentModal({{ $enrollment->id }})" icon="banknotes">
+                                                To'lov
+                                            </flux:button>
+                                        @else
+                                            <flux:button variant="ghost" size="sm" wire:click="openPaymentModal({{ $enrollment->id }})" icon="plus" title="Qo'shimcha to'lov" />
+                                        @endif
+                                        <flux:button
+                                            variant="ghost"
+                                            size="sm"
+                                            wire:click="unenrollStudent({{ $enrollment->id }})"
+                                            wire:confirm="Bu o'quvchini guruhdan chiqarmoqchimisiz?"
+                                            icon="user-minus"
+                                            class="text-red-600 hover:text-red-700"
+                                            title="Guruhdan chiqarish"
+                                        />
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -406,11 +422,65 @@
         </form>
     </flux:modal>
 
+    {{-- Add Student Modal --}}
+    <flux:modal wire:model="showAddStudentModal" class="max-w-lg">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg">O'quvchi qo'shish</flux:heading>
+                <flux:subheading>{{ $group->name }} guruhiga o'quvchi qo'shish</flux:subheading>
+            </div>
+
+            <flux:input
+                wire:model.live.debounce.300ms="studentSearch"
+                placeholder="Ism yoki telefon bo'yicha qidirish..."
+                icon="magnifying-glass"
+            />
+
+            <div class="max-h-64 overflow-y-auto">
+                @if ($this->availableStudents->count() > 0)
+                    <div class="space-y-2">
+                        @foreach ($this->availableStudents as $student)
+                            <div class="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                                <div>
+                                    <div class="font-medium">{{ $student->name }}</div>
+                                    <div class="text-sm text-zinc-500">{{ $student->phone }}</div>
+                                </div>
+                                <flux:button variant="primary" size="sm" wire:click="addStudentDirect({{ $student->id }})" icon="plus">
+                                    Qo'shish
+                                </flux:button>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="py-8 text-center text-zinc-500">
+                        @if ($studentSearch)
+                            "{{ $studentSearch }}" bo'yicha o'quvchi topilmadi
+                        @else
+                            Qidirish uchun ism yoki telefon kiriting
+                        @endif
+                    </div>
+                @endif
+            </div>
+
+            @error('student_id')
+                <flux:text class="text-sm text-red-600">{{ $message }}</flux:text>
+            @enderror
+
+            <div class="flex justify-end">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Yopish</flux:button>
+                </flux:modal.close>
+            </div>
+        </div>
+    </flux:modal>
+
     {{-- Toast notifications --}}
     <div
         x-data="{ show: false, message: '' }"
         @attendance-saved.window="show = true; message = 'Davomat saqlandi!'; setTimeout(() => show = false, 3000)"
         @payment-collected.window="show = true; message = 'Tolov qabul qilindi!'; setTimeout(() => show = false, 3000)"
+        @student-added.window="show = true; message = 'Oquvchi qoshildi!'; setTimeout(() => show = false, 3000)"
+        @student-removed.window="show = true; message = 'Oquvchi chiqarildi!'; setTimeout(() => show = false, 3000)"
         x-show="show"
         x-transition
         class="fixed bottom-4 right-4 rounded-lg bg-green-600 px-4 py-2 text-white shadow-lg"

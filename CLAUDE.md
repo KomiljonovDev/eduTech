@@ -135,3 +135,89 @@ Use these tools when available:
 - Use model factories; check for existing factory states
 - Create tests with `php artisan make:test --phpunit {name}`
 - Do not remove tests without approval
+
+## Queue & Horizon
+
+Loyihada queue uchun **Laravel Horizon** ishlatiladi. Horizon Redis bilan ishlaydi.
+
+### Horizon ishga tushirish
+
+```bash
+# Development
+php artisan horizon
+
+# Production (supervisor bilan)
+php artisan horizon
+```
+
+### Horizon dashboard
+
+`/horizon` URL da Horizon UI mavjud (faqat autentifikatsiya qilingan foydalanuvchilar uchun).
+
+### Queue lar
+
+| Queue | Tavsif |
+|-------|--------|
+| `default` | Umumiy joblar |
+| `sms` | SMS yuborish (SendSms Job) |
+
+### Yangi Job yaratish
+
+```php
+// Default queue ga
+MyJob::dispatch($data);
+
+// Maxsus queue ga
+MyJob::dispatch($data)->onQueue('sms');
+```
+
+## SMS Integration (Eskiz)
+
+SMS yuborish uchun `SendSms` Job ishlatiladi. Bu Job queue orqali ishlaydi.
+
+### Configuration
+
+`.env` faylida quyidagi o'zgaruvchilar bo'lishi kerak:
+
+```env
+ESKIZ_EMAIL=your@email.uz
+ESKIZ_PASSWORD=your_password
+ESKIZ_FROM=4546
+```
+
+### Usage
+
+**MUHIM**: SMS yuborishda doim `SendSms` Job ishlatilsin. Bu queue orqali ishlaydi va xatolik bo'lsa qayta urinadi.
+
+```php
+use App\Jobs\SendSms;
+
+// Oddiy SMS yuborish (queue orqali)
+SendSms::dispatch($phone, $message);
+
+// Callback URL bilan
+SendSms::dispatch($phone, $message, $callbackUrl);
+
+// Kechiktirilgan yuborish
+SendSms::dispatch($phone, $message)->delay(now()->addMinutes(5));
+```
+
+### Direct Service Usage (faqat maxsus holatlarda)
+
+```php
+use App\Services\EskizSmsService;
+
+$sms = app(EskizSmsService::class);
+$result = $sms->send($phone, $message);
+```
+
+### Test Command
+
+```bash
+php artisan sms:test 998901234567
+```
+
+### Test rejimida faqat shu tekstlar ishlaydi:
+- "Это тест от Eskiz"
+- "Bu Eskiz dan test"
+- "This is test from Eskiz"

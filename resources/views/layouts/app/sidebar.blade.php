@@ -33,6 +33,15 @@
                     </flux:sidebar.item>
                 </flux:sidebar.group>
 
+                <flux:sidebar.group heading="Moliya" class="grid">
+                    <flux:sidebar.item icon="arrow-trending-down" :href="route('admin.expenses')" :current="request()->routeIs('admin.expenses')" wire:navigate>
+                        Harajatlar
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="chart-bar" :href="route('admin.reports')" :current="request()->routeIs('admin.reports')" wire:navigate>
+                        Hisobotlar
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+
                 <flux:sidebar.group heading="Sozlamalar" class="grid">
                     <flux:sidebar.item icon="users" :href="route('admin.teachers')" :current="request()->routeIs('admin.teachers')" wire:navigate>
                         Ustozlar
