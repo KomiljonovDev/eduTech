@@ -1,0 +1,22 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/Users/obidjonkomiljonov/Library/Application",
+            "args": [
+                "Support/Herd/bin/php83",
+                "/Users/obidjonkomiljonov/projects/eduTech/artisan",
+                "boost:mcp"
+            ]
+        },
+        "herd": {
+            "command": "/Users/obidjonkomiljonov/Library/Application",
+            "args": [
+                "Support/Herd/bin/php83",
+                "/Applications/Herd.app/Contents/Resources/herd-mcp.phar"
+            ],
+            "env": {
+                "SITE_PATH": "/Users/obidjonkomiljonov/projects/eduTech"
+            }
+        }
+    }
+}
