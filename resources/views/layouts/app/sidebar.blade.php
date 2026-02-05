@@ -33,6 +33,20 @@
                 </flux:sidebar.group>
                 @endrole
 
+                @role('student')
+                <flux:sidebar.group heading="O'quvchi paneli" class="grid">
+                    <flux:sidebar.item icon="home" :href="route('student.dashboard')" :current="request()->routeIs('student.dashboard')" wire:navigate>
+                        Dashboard
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="calendar-days" :href="route('student.schedule')" :current="request()->routeIs('student.schedule')" wire:navigate>
+                        Dars jadvali
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="banknotes" :href="route('student.payments')" :current="request()->routeIs('student.payments')" wire:navigate>
+                        To'lovlar
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+                @endrole
+
                 @role('manager')
                 <flux:sidebar.group heading="O'quv jarayoni" class="grid">
                     <flux:sidebar.item icon="inbox" :href="route('admin.leads')" :current="request()->routeIs('admin.leads')" wire:navigate>
@@ -82,6 +96,12 @@
             </flux:sidebar.nav>
 
             <flux:spacer />
+
+            <flux:sidebar.nav>
+                <flux:sidebar.item icon="question-mark-circle" :href="route('help')" :current="request()->routeIs('help')" wire:navigate>
+                    Qo'llanma
+                </flux:sidebar.item>
+            </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>

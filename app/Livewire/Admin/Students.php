@@ -7,6 +7,9 @@ use App\Models\Discount;
 use App\Models\Enrollment;
 use App\Models\Group;
 use App\Models\Student;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -30,11 +33,15 @@ class Students extends Component
 
     public bool $showBulkEnrollModal = false;
 
+    public bool $showAccountModal = false;
+
     public ?int $editingId = null;
 
     public ?int $enrollingStudentId = null;
 
     public ?int $discountStudentId = null;
+
+    public ?int $accountStudentId = null;
 
     public string $name = '';
 
@@ -63,6 +70,10 @@ class Students extends Component
     public string $bulkSmsMessage = '';
 
     public string $bulkGroupId = '';
+
+    public string $email = '';
+
+    public string $password = '';
 
     #[Url]
     public string $search = '';
@@ -382,13 +393,62 @@ class Students extends Component
         $this->selectAll = false;
     }
 
+    public function openAccountModal(Student $student): void
+    {
+        $this->accountStudentId = $student->id;
+        $this->email = '';
+        $this->password = Str::random(10);
+        $this->showAccountModal = true;
+    }
+
+    public function createAccount(): void
+    {
+        $this->validate([
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:8',
+        ], [
+            'email.unique' => 'Bu email allaqachon ishlatilgan',
+            'password.min' => 'Parol kamida 8 ta belgidan iborat bo\'lishi kerak',
+        ]);
+
+        $student = Student::find($this->accountStudentId);
+
+        if (! $student) {
+            return;
+        }
+
+        $user = User::create([
+            'name' => $student->name,
+            'email' => $this->email,
+            'password' => Hash::make($this->password),
+            'email_verified_at' => now(),
+        ]);
+
+        $user->assignRole('student');
+
+        $student->update(['user_id' => $user->id]);
+
+        $this->showAccountModal = false;
+        $this->dispatch('account-created', password: $this->password);
+        $this->reset(['accountStudentId', 'email', 'password']);
+    }
+
+    public function unlinkAccount(Student $student): void
+    {
+        if ($student->user) {
+            $user = $student->user;
+            $student->update(['user_id' => null]);
+            $user->delete();
+        }
+    }
+
     protected function getStudentsQuery()
     {
         $query = Student::query()
             ->withCount(['enrollments', 'enrollments as active_enrollments_count' => function ($q) {
                 $q->where('status', 'active');
             }, 'discounts'])
-            ->with(['enrollments.group.course', 'discounts', 'phones']);
+            ->with(['enrollments.group.course', 'discounts', 'phones', 'user']);
 
         if ($this->search) {
             $query->where(function ($q) {

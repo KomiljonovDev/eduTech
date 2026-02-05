@@ -22,8 +22,14 @@ class Dashboard extends Component
 
     public function mount(): void
     {
-        if (auth()->user()->hasRole('teacher')) {
+        $user = auth()->user();
+
+        if ($user->hasRole('teacher')) {
             $this->redirect(route('teacher.dashboard'), navigate: true);
+        }
+
+        if ($user->hasRole('student')) {
+            $this->redirect(route('student.dashboard'), navigate: true);
         }
     }
 

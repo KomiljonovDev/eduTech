@@ -73,10 +73,26 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the student profile associated with the user.
+     */
+    public function student(): HasOne
+    {
+        return $this->hasOne(Student::class);
+    }
+
+    /**
      * Check if user is a teacher with a linked profile.
      */
     public function isTeacher(): bool
     {
         return $this->hasRole('teacher') && $this->teacher !== null;
+    }
+
+    /**
+     * Check if user is a student with a linked profile.
+     */
+    public function isStudent(): bool
+    {
+        return $this->hasRole('student') && $this->student !== null;
     }
 }

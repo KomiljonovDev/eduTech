@@ -52,7 +52,8 @@ O'quv markazlarini avtomatlashtirish va boshqarish uchun yaratilgan tizim.
 
 ### Asosiy
 - `GET /` - Bosh sahifa
-- `GET /dashboard` - Dashboard
+- `GET /dashboard` - Dashboard (faqat `manager` roli uchun)
+- `GET /help` - Qo'llanma (barcha rollar, har biri o'ziga tegishli qo'llanmani ko'radi)
 
 ### Admin (`/admin/*`)
 Barcha admin routelari `auth`, `verified`, `role:manager` middleware bilan himoyalangan.
@@ -83,6 +84,16 @@ O'qituvchi paneli. Routelar `auth`, `verified`, `role:teacher` middleware bilan 
 | `/teacher/groups/{group}` | `TeacherGroupDetail` | Guruh tafsilotlari |
 | `/teacher/attendance` | `TeacherAttendance` | Davomat belgilash |
 
+### Student (`/student/*`)
+O'quvchi paneli. Routelar `auth`, `verified`, `role:student` middleware bilan himoyalangan.
+
+| Route | Komponent | Tavsif |
+|-------|-----------|--------|
+| `/student/dashboard` | `StudentDashboard` | O'quvchi dashboard |
+| `/student/schedule` | `StudentSchedule` | O'z dars jadvali |
+| `/student/groups/{group}` | `StudentGroupDetail` | Guruh tafsilotlari |
+| `/student/payments` | `StudentPayments` | To'lovlar tarixi |
+
 ## Ishga Tushirish
 
 ```bash
@@ -112,11 +123,16 @@ app/
 │   │   ├── GroupDetail.php
 │   │   ├── Schedule.php
 │   │   └── ...
-│   └── Teacher/
-│       ├── TeacherDashboard.php
-│       ├── TeacherSchedule.php
-│       ├── TeacherGroupDetail.php
-│       └── TeacherAttendance.php
+│   ├── Teacher/
+│   │   ├── TeacherDashboard.php
+│   │   ├── TeacherSchedule.php
+│   │   ├── TeacherGroupDetail.php
+│   │   └── TeacherAttendance.php
+│   └── Student/
+│       ├── StudentDashboard.php
+│       ├── StudentSchedule.php
+│       ├── StudentGroupDetail.php
+│       └── StudentPayments.php
 ├── Models/
 │   ├── Student.php
 │   ├── Group.php

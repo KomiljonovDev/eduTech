@@ -95,6 +95,7 @@
                     <th class="px-4 py-3 text-left font-medium">Manba</th>
                     <th class="px-4 py-3 text-left font-medium">Guruhlar</th>
                     <th class="px-4 py-3 text-left font-medium">Holat</th>
+                    <th class="px-4 py-3 text-left font-medium">Akkaunt</th>
                     <th class="px-4 py-3 text-right font-medium">Amallar</th>
                 </tr>
             </thead>
@@ -157,17 +158,34 @@
                                 @endif
                             </div>
                         </td>
+                        <td class="px-4 py-3">
+                            @if ($student->user)
+                                <div class="flex items-center gap-2">
+                                    <flux:badge color="blue" size="sm">
+                                        <flux:icon.check class="size-3" />
+                                        {{ $student->user->email }}
+                                    </flux:badge>
+                                </div>
+                            @else
+                                <flux:badge color="zinc" size="sm">Yo'q</flux:badge>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-right">
                             <flux:button variant="ghost" size="sm" :href="route('admin.students.show', $student)" icon="eye" title="Ko'rish" wire:navigate />
                             <flux:button variant="ghost" size="sm" wire:click="openEnrollModal({{ $student->id }})" icon="plus" title="Guruhga qo'shish" />
                             <flux:button variant="ghost" size="sm" wire:click="openDiscountModal({{ $student->id }})" icon="receipt-percent" title="Chegirmalar" />
+                            @if (!$student->user)
+                                <flux:button variant="ghost" size="sm" wire:click="openAccountModal({{ $student->id }})" icon="user-plus" title="Akkaunt yaratish" />
+                            @else
+                                <flux:button variant="ghost" size="sm" wire:click="unlinkAccount({{ $student->id }})" wire:confirm="Bu akkauntni o'chirmoqchimisiz? O'quvchi tizimga kira olmay qoladi." icon="user-minus" title="Akkauntni o'chirish" class="text-red-600" />
+                            @endif
                             <flux:button variant="ghost" size="sm" wire:click="edit({{ $student->id }})" icon="pencil" />
                             <flux:button variant="ghost" size="sm" wire:click="delete({{ $student->id }})" wire:confirm="Rostdan ham o'chirmoqchimisiz?" icon="trash" class="text-red-600 hover:text-red-700" />
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-8 text-center text-zinc-500">
+                        <td colspan="8" class="px-4 py-8 text-center text-zinc-500">
                             O'quvchilar topilmadi
                         </td>
                     </tr>
@@ -417,4 +435,68 @@
             </div>
         </form>
     </flux:modal>
+
+    {{-- Account Modal --}}
+    <flux:modal wire:model="showAccountModal" class="max-w-lg">
+        <form wire:submit="createAccount" class="space-y-6">
+            <div>
+                <flux:heading size="lg">Akkaunt yaratish</flux:heading>
+                <flux:subheading>O'quvchi uchun tizimga kirish akkauntini yarating</flux:subheading>
+            </div>
+
+            <flux:callout color="blue" icon="information-circle">
+                <flux:callout.text>
+                    Akkaunt yaratilgach o'quvchi o'z email va paroli bilan tizimga kirib, dars jadvalini, davomati va to'lovlarini ko'ra oladi.
+                </flux:callout.text>
+            </flux:callout>
+
+            <flux:input wire:model="email" label="Email" type="email" placeholder="oquvchi@example.com" required />
+
+            @error('email')
+                <flux:text class="text-sm text-red-600">{{ $message }}</flux:text>
+            @enderror
+
+            <div>
+                <flux:input wire:model="password" label="Parol" required />
+                <flux:text class="mt-1 text-xs text-zinc-500">
+                    Avtomatik yaratilgan parol. O'zgartirishingiz mumkin.
+                </flux:text>
+            </div>
+
+            @error('password')
+                <flux:text class="text-sm text-red-600">{{ $message }}</flux:text>
+            @enderror
+
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Bekor qilish</flux:button>
+                </flux:modal.close>
+                <flux:button variant="primary" type="submit" icon="user-plus">
+                    Akkaunt yaratish
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    {{-- Password Display Toast --}}
+    <div
+        x-data="{ show: false, password: '' }"
+        x-on:account-created.window="show = true; password = $event.detail.password"
+        x-show="show"
+        x-transition
+        class="fixed bottom-4 right-4 max-w-md rounded-lg bg-green-600 p-4 text-white shadow-lg"
+    >
+        <div class="flex items-start gap-3">
+            <flux:icon.check-circle class="size-6 flex-shrink-0" />
+            <div>
+                <div class="font-medium">Akkaunt yaratildi!</div>
+                <div class="mt-1 text-sm opacity-90">
+                    Parolni saqlang: <code class="rounded bg-green-700 px-2 py-0.5" x-text="password"></code>
+                </div>
+                <button @click="show = false" class="mt-2 text-sm underline opacity-75 hover:opacity-100">
+                    Yopish
+                </button>
+            </div>
+        </div>
+    </div>
 </div>

@@ -39,7 +39,9 @@ app/
 ├── Livewire/               # Livewire komponentlar
 │   ├── Actions/            # Action komponentlar (Logout)
 │   ├── Admin/              # Admin panel komponentlar
-│   └── Dashboard.php       # Asosiy dashboard
+│   ├── Teacher/            # O'qituvchi panel komponentlar
+│   ├── Student/            # O'quvchi panel komponentlar
+│   └── Dashboard.php       # Asosiy dashboard (faqat manager)
 ├── Mcp/                    # AI integration
 │   ├── Servers/            # MCP serverlar
 │   └── Tools/              # MCP tools
@@ -71,7 +73,9 @@ resources/views/
 
 routes/
 ├── web.php                 # Asosiy routelar
-├── admin.php               # Admin routelar
+├── admin.php               # Admin routelar (role:manager)
+├── teacher.php             # O'qituvchi routelar (role:teacher)
+├── student.php             # O'quvchi routelar (role:student)
 ├── settings.php            # Settings routelar
 ├── ai.php                  # MCP routelar
 └── console.php             # Console routelar
@@ -217,18 +221,77 @@ Fortify orqali boshqariladi:
 
 ## Rollar va Ruxsatlar
 
-Spatie Laravel Permission ishlatiladi:
+Spatie Laravel Permission ishlatiladi.
+
+### Mavjud Rollar
+
+| Rol | Tavsif | Dashboard Route |
+|-----|--------|-----------------|
+| `manager` | Admin/Menejer | `/dashboard` |
+| `teacher` | O'qituvchi | `/teacher/dashboard` |
+| `student` | O'quvchi | `/student/dashboard` |
+
+### Middleware Konfiguratsiyasi
 
 ```php
-// Rol tekshirish
-if ($user->hasRole('manager')) {
-    // Admin panel
+// bootstrap/app.php
+$middleware->alias([
+    'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+    'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+    'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+]);
+```
+
+### Route Himoyasi
+
+```php
+// Admin routelar - faqat manager
+Route::middleware(['auth', 'verified', 'role:manager'])->group(...);
+
+// O'qituvchi routelar - faqat teacher
+Route::middleware(['auth', 'verified', 'role:teacher'])->group(...);
+
+// O'quvchi routelar - faqat student
+Route::middleware(['auth', 'verified', 'role:student'])->group(...);
+```
+
+### Dashboard Redirect
+
+Asosiy `/dashboard` route faqat `manager` roli uchun. Boshqa rollar o'z dashboardlariga avtomatik redirect qilinadi:
+
+```php
+// Dashboard.php mount() metodida
+if ($user->hasRole('teacher')) {
+    $this->redirect(route('teacher.dashboard'));
 }
 
-// Middleware
-Route::middleware(['role:manager'])->group(function () {
-    // Admin routes
-});
+if ($user->hasRole('student')) {
+    $this->redirect(route('student.dashboard'));
+}
+```
+
+## Qo'llanma Tizimi
+
+Platforma ichida foydalanuvchi qo'llanmasi mavjud (`/help`). Har bir rol faqat o'ziga tegishli qo'llanmani ko'radi.
+
+### Mavjud Qo'llanmalar
+
+| Rol | Bo'limlar |
+|-----|-----------|
+| `manager` | Dashboard, Leadlar, O'quvchilar, Guruhlar, Davomat, Dars jadvali, Qarzdorliklar, Xarajatlar, Hisobotlar, Ustozlar, Yo'nalishlar, Xonalar, Chegirmalar |
+| `teacher` | Dashboard, Dars jadvali, Davomat, Hisobim |
+| `student` | Dashboard, Dars jadvali, To'lovlar |
+
+### Qo'llanma Komponentlari
+
+```blade
+{{-- Qo'llanma sahifasiga link --}}
+<x-help-button section="students" title="Yordam" />
+
+{{-- Modal ko'rinishida yordam --}}
+<x-help-modal title="O'quvchilar">
+    <p>Bu yerda o'quvchilar haqida ma'lumot...</p>
+</x-help-modal>
 ```
 
 ## Konvensiyalar
