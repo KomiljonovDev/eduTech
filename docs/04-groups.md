@@ -79,7 +79,12 @@ public function save(): void
 protected function rules(): array
 {
     return [
-        'name' => 'required|string|max:255',
+        'name' => [
+            'required',
+            'string',
+            'max:255',
+            'unique:groups,name' . ($this->editingId ? ',' . $this->editingId : ''),
+        ],
         'course_id' => 'required|exists:courses,id',
         'teacher_id' => 'required|exists:teachers,id',
         'room_id' => 'required|exists:rooms,id',
@@ -92,6 +97,8 @@ protected function rules(): array
     ];
 }
 ```
+
+**Muhim**: Guruh nomi (`name`) unique bo'lishi kerak. Database darajasida ham `unique` index mavjud.
 
 ## Guruh Detail (GroupDetail.php)
 
@@ -334,3 +341,4 @@ pending ──► active ──► completed
 - [Xonalar](./13-rooms.md) - Dars o'tiladigan xona
 - [Davomat](./07-attendance.md) - Guruh davomati
 - [To'lovlar](./06-payments.md) - Guruh to'lovlari
+- [Dars jadvali](./18-schedule.md) - Haftalik dars jadvali

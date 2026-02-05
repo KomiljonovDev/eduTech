@@ -1,25 +1,17 @@
 <?php
 
-namespace App\Livewire\Admin;
+namespace App\Livewire\Teacher;
 
-use App\Models\Group;
-use App\Models\Room;
+use App\Models\Teacher;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts::app')]
 #[Title('Dars jadvali')]
-class Schedule extends Component
+class TeacherSchedule extends Component
 {
-    #[Url]
-    public string $days = '';
-
-    #[Url]
-    public string $room_id = '';
-
     public array $timeSlots = [
         '08:00', '09:00', '10:00', '11:00', '12:00',
         '13:00', '14:00', '15:00', '16:00', '17:00',
@@ -27,20 +19,24 @@ class Schedule extends Component
     ];
 
     #[Computed]
-    public function rooms()
+    public function teacher(): ?Teacher
     {
-        return Room::orderBy('name')->get();
+        return auth()->user()->teacher;
     }
 
     #[Computed]
     public function groups()
     {
-        return Group::query()
-            ->with(['course', 'teacher', 'room'])
+        $teacher = $this->teacher;
+
+        if (! $teacher) {
+            return collect();
+        }
+
+        return $teacher->groups()
+            ->with(['course', 'room'])
             ->withCount(['enrollments' => fn ($q) => $q->where('status', 'active')])
             ->whereIn('status', ['active', 'pending'])
-            ->when($this->days, fn ($q) => $q->where('days', $this->days))
-            ->when($this->room_id, fn ($q) => $q->where('room_id', $this->room_id))
             ->orderBy('start_time')
             ->get();
     }
@@ -57,13 +53,7 @@ class Schedule extends Component
         return $this->groups->where('days', 'even');
     }
 
-    #[Computed]
-    public function groupedByRoom()
-    {
-        return $this->groups->groupBy('room_id');
-    }
-
-    public function getGroupsForSlot(string $time, string $days): \Illuminate\Support\Collection
+    public function getGroupsForSlot(string $time, string $days)
     {
         return $this->groups->filter(function ($group) use ($time, $days) {
             if ($group->days !== $days) {
@@ -86,13 +76,12 @@ class Schedule extends Component
         return match ($status) {
             'active' => 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700',
             'pending' => 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700',
-            'completed' => 'bg-zinc-100 border-zinc-300 dark:bg-zinc-800 dark:border-zinc-600',
             default => 'bg-zinc-100 border-zinc-300 dark:bg-zinc-800 dark:border-zinc-600',
         };
     }
 
     public function render()
     {
-        return view('livewire.admin.schedule');
+        return view('livewire.teacher.schedule');
     }
 }

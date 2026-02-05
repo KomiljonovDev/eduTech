@@ -19,6 +19,11 @@
         </div>
         <flux:menu.separator />
         <flux:menu.radio.group>
+            @role('teacher')
+            <flux:menu.item :href="route('teacher.finance')" icon="wallet" wire:navigate>
+                Hisobim
+            </flux:menu.item>
+            @endrole
             <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
                 {{ __('Settings') }}
             </flux:menu.item>

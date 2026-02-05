@@ -42,9 +42,16 @@ class Payment extends Model
         static::creating(function (Payment $payment) {
             if ($payment->enrollment_id && (! $payment->teacher_share || ! $payment->school_share)) {
                 $teacher = $payment->enrollment->group->teacher;
-                $percentage = $teacher->payment_percentage / 100;
-                $payment->teacher_share = $payment->amount * $percentage;
-                $payment->school_share = $payment->amount - $payment->teacher_share;
+
+                // Fixed salary bo'lsa, teacher_share 0 (chunki ular alohida to'lanadi)
+                if ($teacher->salary_type === Teacher::SALARY_TYPE_FIXED) {
+                    $payment->teacher_share = 0;
+                    $payment->school_share = $payment->amount;
+                } else {
+                    $percentage = $teacher->payment_percentage / 100;
+                    $payment->teacher_share = $payment->amount * $percentage;
+                    $payment->school_share = $payment->amount - $payment->teacher_share;
+                }
             }
         });
     }

@@ -30,6 +30,7 @@ O'quv markazlarini avtomatlashtirish va boshqarish uchun yaratilgan tizim.
 | [Hisobotlar](./14-reports.md) | `Reports.php` | Statistika va hisobotlar |
 | [MCP Tools](./15-mcp-tools.md) | `app/Mcp/Tools/` | AI agent vositalari |
 | [SMS Xizmat](./16-sms-service.md) | `EskizSmsService.php` | SMS yuborish |
+| [Dars Jadvali](./18-schedule.md) | `Schedule.php` | Haftalik dars jadvali |
 
 ## Ma'lumotlar Bazasi Diagrammasi
 
@@ -59,6 +60,7 @@ Barcha admin routelari `auth`, `verified`, `role:manager` middleware bilan himoy
 | Route | Komponent | Tavsif |
 |-------|-----------|--------|
 | `/admin/students` | `Students` | Talabalar ro'yxati |
+| `/admin/students/{student}` | `StudentShow` | Talaba profili (to'liq ma'lumotlar) |
 | `/admin/groups` | `Groups` | Guruhlar ro'yxati |
 | `/admin/groups/{group}` | `GroupDetail` | Guruh tafsilotlari |
 | `/admin/teachers` | `Teachers` | O'qituvchilar |
@@ -69,6 +71,17 @@ Barcha admin routelari `auth`, `verified`, `role:manager` middleware bilan himoy
 | `/admin/attendance` | `Attendance` | Davomat |
 | `/admin/expenses` | `Expenses` | Xarajatlar |
 | `/admin/reports` | `Reports` | Hisobotlar |
+| `/admin/schedule` | `Schedule` | Dars jadvali |
+
+### Teacher (`/teacher/*`)
+O'qituvchi paneli. Routelar `auth`, `verified`, `role:teacher` middleware bilan himoyalangan.
+
+| Route | Komponent | Tavsif |
+|-------|-----------|--------|
+| `/teacher/dashboard` | `TeacherDashboard` | Ustoz dashboard |
+| `/teacher/schedule` | `TeacherSchedule` | O'z dars jadvali |
+| `/teacher/groups/{group}` | `TeacherGroupDetail` | Guruh tafsilotlari |
+| `/teacher/attendance` | `TeacherAttendance` | Davomat belgilash |
 
 ## Ishga Tushirish
 
@@ -92,15 +105,23 @@ composer lint
 app/
 ├── Livewire/
 │   ├── Dashboard.php
-│   └── Admin/
-│       ├── Students.php
-│       ├── Groups.php
-│       ├── GroupDetail.php
-│       └── ...
+│   ├── Admin/
+│   │   ├── Students.php
+│   │   ├── StudentShow.php
+│   │   ├── Groups.php
+│   │   ├── GroupDetail.php
+│   │   ├── Schedule.php
+│   │   └── ...
+│   └── Teacher/
+│       ├── TeacherDashboard.php
+│       ├── TeacherSchedule.php
+│       ├── TeacherGroupDetail.php
+│       └── TeacherAttendance.php
 ├── Models/
 │   ├── Student.php
 │   ├── Group.php
 │   ├── Enrollment.php
+│   ├── Teacher.php
 │   └── ...
 ├── Mcp/
 │   ├── Servers/EduServer.php

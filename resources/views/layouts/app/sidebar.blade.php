@@ -11,11 +11,27 @@
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
+                @role('manager')
                 <flux:sidebar.group :heading="__('Platform')" class="grid">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
+                @endrole
+
+                @role('teacher')
+                <flux:sidebar.group heading="Ustoz paneli" class="grid">
+                    <flux:sidebar.item icon="home" :href="route('teacher.dashboard')" :current="request()->routeIs('teacher.dashboard')" wire:navigate>
+                        Dashboard
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="calendar-days" :href="route('teacher.schedule')" :current="request()->routeIs('teacher.schedule')" wire:navigate>
+                        Dars jadvali
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="clipboard-document-check" :href="route('teacher.attendance')" :current="request()->routeIs('teacher.attendance')" wire:navigate>
+                        Davomat
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+                @endrole
 
                 @role('manager')
                 <flux:sidebar.group heading="O'quv jarayoni" class="grid">
@@ -103,6 +119,11 @@
                     <flux:menu.separator />
 
                     <flux:menu.radio.group>
+                        @role('teacher')
+                        <flux:menu.item :href="route('teacher.finance')" icon="wallet" wire:navigate>
+                            Hisobim
+                        </flux:menu.item>
+                        @endrole
                         <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
                             {{ __('Settings') }}
                         </flux:menu.item>

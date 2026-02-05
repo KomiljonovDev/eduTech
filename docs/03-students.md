@@ -1,95 +1,244 @@
 # Talabalar Moduli
 
-Talabalarni boshqarish, qidirish va ro'yxatga olish funksionalligi.
+Talabalarni boshqarish, qidirish, ro'yxatga olish va to'liq profil ko'rish funksionalligi.
 
 ## Fayllar
 
-- **Komponent**: `app/Livewire/Admin/Students.php`
-- **View**: `resources/views/livewire/admin/students.blade.php`
+- **Ro'yxat**: `app/Livewire/Admin/Students.php`
+- **Detail**: `app/Livewire/Admin/StudentShow.php`
+- **Views**: `resources/views/livewire/admin/students.blade.php`, `student-show.blade.php`
 - **Model**: `app/Models/Student.php`
-- **Route**: `GET /admin/students`
+- **Routes**:
+  - `GET /admin/students` - Ro'yxat
+  - `GET /admin/students/{student}` - Detail sahifa
 
-## Funksionallik
-
-### Talabalar Ro'yxati
-
-```php
-// Filterlash va qidirish
-#[Url] public string $search = '';
-#[Url] public string $filterSource = '';
-#[Url] public string $filterStatus = ''; // active, waiting
-
-// Eager loading
-$query = Student::with(['enrollments.group.course', 'activeDiscounts'])
-    ->withCount([
-        'enrollments',
-        'enrollments as active_enrollments_count' => fn ($q) => $q->where('status', 'active')
-    ]);
-```
+## Talabalar Ro'yxati (Students.php)
 
 ### Filterlar
 
+```php
+#[Url] public string $search = '';
+#[Url] public string $filter = 'all'; // all, waiting, active, completed_ks
+```
+
 | Filter | Tavsif |
 |--------|--------|
-| `search` | Ism yoki telefon bo'yicha qidirish |
-| `filterSource` | Manba bo'yicha (instagram, telegram, etc.) |
-| `filterStatus` | `active` - faol o'qiyotganlar, `waiting` - kutayotganlar |
+| `all` | Barcha talabalar |
+| `waiting` | Kutayotganlar (faol enrollment yo'q) |
+| `active` | Faol o'qiyotganlar |
+| `completed_ks` | KS kursini tugatganlar |
 
-### CRUD Operatsiyalari
+### Bulk Amallar
 
-#### Yaratish
 ```php
-public function create(): void
+// Tanlangan talabalar
+public array $selected = [];
+public bool $selectAll = false;
+
+// Bulk SMS
+public function sendBulkSms(): void
 {
-    $this->reset(['editingId', 'name', 'phone', 'address', 'birth_date', 'source', 'notes']);
-    $this->source = 'walk_in';
-    $this->showModal = true;
+    $students = Student::whereIn('id', $this->selected)->get();
+    foreach ($students as $student) {
+        SendSms::dispatch($student->display_phone, $this->bulkSmsMessage);
+    }
+}
+
+// Bulk Guruhga qo'shish
+public function bulkEnroll(): void
+{
+    $students = Student::whereIn('id', $this->selected)->get();
+    foreach ($students as $student) {
+        Enrollment::firstOrCreate([
+            'student_id' => $student->id,
+            'group_id' => $this->bulkGroupId,
+        ], [
+            'enrolled_at' => now(),
+            'status' => 'active',
+        ]);
+    }
 }
 ```
 
-#### Tahrirlash
-```php
-public function edit(Student $student): void
-{
-    $this->editingId = $student->id;
-    $this->name = $student->name;
-    $this->phone = $student->phone;
-    // ...
-    $this->showModal = true;
-}
+### Guruhga Qo'shish Modali
+
+Guruh tanlashda dars vaqti ham ko'rsatiladi:
+
+```blade
+<flux:select wire:model="group_id">
+    @foreach ($this->availableGroups as $group)
+        <flux:select.option value="{{ $group->id }}">
+            {{ $group->course->code }} |
+            {{ $group->name }} |
+            {{ $group->teacher->name }} |
+            {{ $group->days_label }} {{ $group->start_time->format('H:i') }}-{{ $group->end_time->format('H:i') }}
+            ({{ $group->enrollments_count }}/{{ $group->room->capacity }})
+        </flux:select.option>
+    @endforeach
+</flux:select>
 ```
 
-#### Saqlash
+## Talaba Detail Sahifasi (StudentShow.php)
+
+O'quvchi ustiga bosilganda to'liq profil sahifasi ochiladi.
+
+### Mount
+
 ```php
-public function save(): void
+public function mount(Student $student): void
 {
-    $this->validate([
-        'name' => 'required|string|max:255',
-        'phone' => 'required|string|max:20',
-        'source' => 'required|in:instagram,telegram,referral,walk_in,grand,other',
+    $this->student = $student->load([
+        'phones',
+        'discounts',
+        'enrollments.group.course',
+        'enrollments.group.teacher',
+        'enrollments.payments',
+        'enrollments.attendances',
+        'lead.course',
+        'lead.activities.user',
     ]);
-
-    Student::updateOrCreate(
-        ['id' => $this->editingId],
-        [
-            'name' => $this->name,
-            'phone' => $this->phone,
-            'address' => $this->address ?: null,
-            'birth_date' => $this->birth_date ?: null,
-            'source' => $this->source,
-            'notes' => $this->notes ?: null,
-        ]
-    );
-
-    $this->showModal = false;
 }
 ```
 
-#### O'chirish
+### Ko'rsatiladigan Ma'lumotlar
+
+#### Statistika
+- Faol guruhlar soni
+- Tugatgan kurslar soni
+- Jami to'langan summa
+- Chegirmalar soni
+
 ```php
-public function delete(Student $student): void
+#[Computed]
+public function totalPaid(): float
 {
-    $student->delete();
+    return $this->student->enrollments->sum(fn ($e) => $e->payments->sum('amount'));
+}
+```
+
+#### Guruhlar Ro'yxati
+
+Barcha enrollmentlar (faol, tugatgan, chiqarilgan):
+- Kurs nomi
+- Guruh nomi va ustoz
+- Jadval (kunlar va vaqt)
+- To'langan summa
+- Davomat statistikasi
+
+```blade
+@foreach ($student->enrollments as $enrollment)
+    <a href="{{ route('admin.groups.show', $enrollment->group) }}">
+        <span>{{ $enrollment->group->course->name }}</span>
+        <flux:badge :color="$enrollment->status === 'active' ? 'green' : 'blue'">
+            {{ $enrollment->status }}
+        </flux:badge>
+        <span>To'langan: {{ $enrollment->payments->sum('amount') }}</span>
+    </a>
+@endforeach
+```
+
+#### To'lovlar Tarixi
+
+Oxirgi 10 ta to'lov:
+- Summa
+- Kurs va davr
+- To'lov usuli
+- Sana
+
+```php
+$allPayments = $student->enrollments->flatMap->payments->sortByDesc('paid_at');
+```
+
+#### Lead Tarixi (agar mavjud bo'lsa)
+
+Agar o'quvchi Lead dan konvert bo'lgan bo'lsa:
+- Lead yaratilgan sana
+- Qaysi kurs uchun
+- LeadActivity ro'yxati (qo'ng'iroqlar tarixi)
+
+```blade
+@if ($student->lead->count() > 0)
+    @foreach ($student->lead as $lead)
+        <div>Lead tarixi - {{ $lead->created_at->format('d.m.Y') }}</div>
+        @foreach ($lead->activities as $activity)
+            <div>
+                <flux:badge>{{ $activity->outcome }}</flux:badge>
+                {{ $activity->notes }}
+                {{ $activity->contacted_at->format('d.m.Y H:i') }}
+            </div>
+        @endforeach
+    @endforeach
+@endif
+```
+
+#### Kontakt Ma'lumotlari
+
+- Barcha telefon raqamlari (asosiy, uy, qo'shimcha)
+- Manzil
+- Manba (Instagram, Telegram, etc.)
+- Izoh
+- Ro'yxatdan o'tgan sana
+
+#### Chegirmalar
+
+- Mavjud chegirmalar ro'yxati
+- Chegirma qo'shish
+- Chegirma olib tashlash
+
+```php
+public function addDiscount(): void
+{
+    $this->student->discounts()->attach($this->discount_id, [
+        'valid_from' => now(),
+    ]);
+}
+
+public function removeDiscount(int $discountId): void
+{
+    $this->student->discounts()->detach($discountId);
+}
+```
+
+### Havolalar
+
+Jadvalda va guruh ichida talaba nomiga bosish orqali:
+
+```blade
+{{-- students.blade.php --}}
+<a href="{{ route('admin.students.show', $student) }}" wire:navigate>
+    {{ $student->name }}
+</a>
+
+{{-- group-detail.blade.php --}}
+<a href="{{ route('admin.students.show', $enrollment->student) }}" wire:navigate>
+    {{ $enrollment->student->name }}
+</a>
+```
+
+## Model Munosabatlari
+
+```php
+// Student.php
+public function enrollments(): HasMany
+{
+    return $this->hasMany(Enrollment::class);
+}
+
+public function lead(): HasMany
+{
+    return $this->hasMany(Lead::class, 'converted_student_id');
+}
+
+public function discounts(): BelongsToMany
+{
+    return $this->belongsToMany(Discount::class)
+        ->withPivot(['valid_from', 'valid_until', 'notes'])
+        ->withTimestamps();
+}
+
+public function phones(): MorphMany
+{
+    return $this->morphMany(Phone::class, 'phoneable');
 }
 ```
 
@@ -98,110 +247,20 @@ public function delete(Student $student): void
 ### Faol (Active)
 Kamida bitta `active` statusli enrollment mavjud.
 
-```php
-// Faol talabalarni olish
-Student::whereHas('enrollments', fn ($q) => $q->where('status', 'active'))->get();
-```
-
 ### Kutayotgan (Waiting)
-Hech qanday `active` enrollment yo'q - yangi yoki kursni tugatgan.
+Hech qanday `active` enrollment yo'q.
+
+### KS Tugatgan
+`completed` statusli enrollment va kurs kodi `KS`.
 
 ```php
-// Kutayotgan talabalarni olish
-Student::whereDoesntHave('enrollments', fn ($q) => $q->where('status', 'active'))->get();
-```
-
-## Chegirma Bog'lash
-
-Talabaga chegirma biriktirish `discount_student` pivot jadvali orqali.
-
-```php
-// Chegirma qo'shish
-$student->discounts()->attach($discountId, [
-    'valid_from' => now(),
-    'valid_until' => now()->addMonths(6), // yoki null (cheksiz)
-]);
-
-// Faol chegirmalarni olish
-$student->activeDiscounts; // Hozirgi sanada amal qiluvchilar
-```
-
-## Manba (Source) Statistikasi
-
-```php
-// Manba bo'yicha statistika
-Student::select('source', DB::raw('count(*) as count'))
-    ->groupBy('source')
-    ->pluck('count', 'source');
-```
-
-## View Strukturasi
-
-```blade
-<div class="space-y-6">
-    {{-- Header --}}
-    <div class="flex items-center justify-between">
-        <flux:heading>Talabalar</flux:heading>
-        <flux:button wire:click="create">Yangi talaba</flux:button>
-    </div>
-
-    {{-- Filters --}}
-    <div class="flex gap-4">
-        <flux:input wire:model.live.debounce="search" placeholder="Qidirish..." />
-        <flux:select wire:model.live="filterSource">
-            <option value="">Barcha manbalar</option>
-            <option value="instagram">Instagram</option>
-            ...
-        </flux:select>
-        <flux:select wire:model.live="filterStatus">
-            <option value="">Barcha holatlar</option>
-            <option value="active">Faol</option>
-            <option value="waiting">Kutayotgan</option>
-        </flux:select>
-    </div>
-
-    {{-- Table --}}
-    <table>
-        @foreach ($students as $student)
-            <tr>
-                <td>{{ $student->name }}</td>
-                <td>{{ $student->phone }}</td>
-                <td>{{ $student->active_enrollments_count }}</td>
-                ...
-            </tr>
-        @endforeach
-    </table>
-
-    {{-- Modal --}}
-    <flux:modal wire:model="showModal">
-        <form wire:submit="save">
-            <flux:input wire:model="name" label="Ism" />
-            <flux:input wire:model="phone" label="Telefon" />
-            ...
-            <flux:button type="submit">Saqlash</flux:button>
-        </form>
-    </flux:modal>
-</div>
-```
-
-## Talaba Detali
-
-Alohida sahifa yo'q - `GroupDetail` orqali guruh ichida ko'rinadi.
-
-### Talaba haqida ma'lumot olish:
-- Faol guruhlar
-- To'lov tarixi
-- Davomat statistikasi
-- Chegirmalar
-
-```php
-// Talabaning to'liq ma'lumotlari
-$student->load([
-    'enrollments.group.course',
-    'enrollments.payments',
-    'enrollments.attendances',
-    'activeDiscounts',
-]);
+// Filter
+if ($this->filter === 'completed_ks') {
+    $query->whereHas('enrollments', function ($q) {
+        $q->where('status', 'completed')
+            ->whereHas('group.course', fn ($cq) => $cq->where('code', 'KS'));
+    });
+}
 ```
 
 ## Validatsiya
@@ -212,10 +271,13 @@ protected function rules(): array
     return [
         'name' => 'required|string|max:255',
         'phone' => 'required|string|max:20',
-        'address' => 'nullable|string|max:500',
-        'birth_date' => 'nullable|date',
+        'home_phone' => 'nullable|string|max:20',
+        'phones' => 'nullable|array|max:4',
+        'phones.*.number' => 'nullable|string|max:20',
+        'phones.*.owner' => 'nullable|string|max:50',
+        'address' => 'nullable|string|max:255',
         'source' => 'required|in:instagram,telegram,referral,walk_in,grand,other',
-        'notes' => 'nullable|string|max:1000',
+        'notes' => 'nullable|string',
     ];
 }
 ```
@@ -226,3 +288,4 @@ protected function rules(): array
 - [To'lovlar](./06-payments.md) - Talabadan to'lov qabul qilish
 - [Chegirmalar](./09-discounts.md) - Talabaga chegirma berish
 - [Davomat](./07-attendance.md) - Talaba davomati
+- [Lidlar](./08-leads.md) - Lead tarixi

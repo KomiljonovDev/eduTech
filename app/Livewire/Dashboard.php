@@ -20,6 +20,13 @@ class Dashboard extends Component
 {
     public bool $showNetIncome = false;
 
+    public function mount(): void
+    {
+        if (auth()->user()->hasRole('teacher')) {
+            $this->redirect(route('teacher.dashboard'), navigate: true);
+        }
+    }
+
     #[Computed]
     public function stats()
     {
