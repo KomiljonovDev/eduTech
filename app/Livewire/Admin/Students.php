@@ -116,11 +116,13 @@ class Students extends Component
 
     public function edit(Student $student): void
     {
+        $student->load('phones');
+
         $this->editingId = $student->id;
         $this->name = $student->name;
-        $this->phone = $student->phone;
-        $this->home_phone = $student->home_phone ?? '';
-        $this->phones = $student->phones->map(fn ($p) => ['number' => $p->number, 'owner' => $p->owner ?? ''])->toArray();
+        $this->phone = $student->primaryPhone?->number ?? '';
+        $this->home_phone = $student->homePhone?->number ?? '';
+        $this->phones = $student->extraPhones->map(fn ($p) => ['number' => $p->number, 'owner' => $p->owner ?? ''])->toArray();
         $this->address = $student->address ?? '';
         $this->source = $student->source;
         $this->notes = $student->notes ?? '';
@@ -148,21 +150,40 @@ class Students extends Component
             ['id' => $this->editingId],
             [
                 'name' => $this->name,
-                'phone' => $this->phone,
-                'home_phone' => $this->home_phone ?: null,
                 'address' => $this->address ?: null,
                 'source' => $this->source,
                 'notes' => $this->notes ?: null,
             ]
         );
 
-        // Sync phones
+        // Delete all existing phones and recreate them
         $student->phones()->delete();
+
+        // Save primary phone
+        if (! empty($this->phone)) {
+            $student->phones()->create([
+                'number' => $this->phone,
+                'owner' => null,
+                'is_primary' => true,
+            ]);
+        }
+
+        // Save home phone
+        if (! empty($this->home_phone)) {
+            $student->phones()->create([
+                'number' => $this->home_phone,
+                'owner' => 'Uy',
+                'is_primary' => false,
+            ]);
+        }
+
+        // Save extra phones
         foreach ($this->phones as $phone) {
             if (! empty($phone['number'])) {
                 $student->phones()->create([
                     'number' => $phone['number'],
                     'owner' => $phone['owner'] ?: null,
+                    'is_primary' => false,
                 ]);
             }
         }
@@ -283,10 +304,13 @@ class Students extends Component
             'bulkSmsMessage' => 'required|string|min:3|max:500',
         ]);
 
-        $students = Student::whereIn('id', $this->selected)->get();
+        $students = Student::with('primaryPhone')->whereIn('id', $this->selected)->get();
 
         foreach ($students as $student) {
-            SendSms::dispatch($student->phone, $this->bulkSmsMessage);
+            $phone = $student->primaryPhone?->number ?? $student->display_phone;
+            if ($phone) {
+                SendSms::dispatch($phone, $this->bulkSmsMessage);
+            }
         }
 
         $this->showBulkSmsModal = false;
@@ -369,7 +393,9 @@ class Students extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('phone', 'like', "%{$this->search}%");
+                    ->orWhereHas('phones', function ($phoneQuery) {
+                        $phoneQuery->where('number', 'like', "%{$this->search}%");
+                    });
             });
         }
 

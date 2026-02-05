@@ -126,7 +126,7 @@ class AttendanceReportTool extends Tool
 
         $output = "📊 TALABA DAVOMAT HISOBOTI\n\n";
         $output .= "🎓 Talaba: {$student->name}\n";
-        $output .= "📱 Tel: {$student->phone}\n\n";
+        $output .= "📱 Tel: {$student->display_phone}\n\n";
 
         $totalPresent = 0;
         $totalAbsent = 0;

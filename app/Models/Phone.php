@@ -12,7 +12,15 @@ class Phone extends Model
         'phoneable_id',
         'number',
         'owner',
+        'is_primary',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_primary' => 'boolean',
+        ];
+    }
 
     public function phoneable(): MorphTo
     {

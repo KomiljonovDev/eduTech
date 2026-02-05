@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Models\Attendance as AttendanceModel;
 use App\Models\Enrollment;
 use App\Models\Group;
+use App\Models\OutstandingDebt;
 use App\Models\Payment;
 use App\Models\Student;
 use Livewire\Attributes\Computed;
@@ -50,7 +51,31 @@ class GroupDetail extends Component
         $this->group = $group->load(['course', 'teacher', 'room']);
         $this->lesson_date = now()->format('Y-m-d');
         $this->period = now()->format('Y-m');
+
+        // Avtomatik keyingi davomati yo'q bo'lgan darsni tanlash
+        $this->selectNextUnmarkedLesson();
         $this->loadAttendance();
+    }
+
+    protected function selectNextUnmarkedLesson(): void
+    {
+        $markedLessons = AttendanceModel::whereHas('enrollment', fn ($q) => $q->where('group_id', $this->group->id))
+            ->distinct('lesson_number')
+            ->pluck('lesson_number')
+            ->toArray();
+
+        $maxLesson = $this->group->total_lessons ?? 24;
+
+        for ($i = 1; $i <= $maxLesson; $i++) {
+            if (! in_array($i, $markedLessons)) {
+                $this->lesson_number = $i;
+
+                return;
+            }
+        }
+
+        // Agar hammasi qilingan bo'lsa, oxirgisini ko'rsatish
+        $this->lesson_number = count($markedLessons) > 0 ? max($markedLessons) : 1;
     }
 
     public function getTitle(): string
@@ -256,6 +281,73 @@ class GroupDetail extends Component
         }
 
         $this->dispatch('attendance-saved');
+
+        // Oxirgi dars bo'lsa, guruhni tugatish
+        if ($this->isLastLesson()) {
+            $this->completeGroup();
+
+            return;
+        }
+
+        // Avtomatik keyingi darsga o'tish
+        $this->goToNextLesson();
+    }
+
+    protected function isLastLesson(): bool
+    {
+        $markedLessons = AttendanceModel::whereHas('enrollment', fn ($q) => $q->where('group_id', $this->group->id))
+            ->distinct('lesson_number')
+            ->count('lesson_number');
+
+        return $markedLessons >= $this->group->total_lessons;
+    }
+
+    public function completeGroup(): void
+    {
+        // Har bir enrollment uchun OutstandingDebt yaratish (agar qarz bo'lsa)
+        foreach ($this->group->enrollments()->where('status', 'active')->get() as $enrollment) {
+            // OutstandingDebt yaratish (ichida hisob-kitob qilinadi)
+            $debt = OutstandingDebt::createFromEnrollment($enrollment, 'completed');
+
+            $enrollment->update([
+                'status' => 'completed',
+                'final_balance' => $debt?->original_amount ?? 0,
+            ]);
+        }
+
+        // Guruhni tugatish
+        $this->group->update([
+            'status' => 'completed',
+            'end_date' => now(),
+        ]);
+
+        $this->dispatch('group-completed');
+    }
+
+    public function goToNextLesson(): void
+    {
+        // Keyingi davomati yo'q bo'lgan darsni topish
+        $markedLessons = AttendanceModel::whereHas('enrollment', fn ($q) => $q->where('group_id', $this->group->id))
+            ->distinct('lesson_number')
+            ->pluck('lesson_number')
+            ->toArray();
+
+        $maxLesson = $this->group->total_lessons ?? 24;
+
+        for ($i = 1; $i <= $maxLesson; $i++) {
+            if (! in_array($i, $markedLessons)) {
+                $this->lesson_number = $i;
+                $this->lesson_date = now()->format('Y-m-d');
+                $this->loadAttendance();
+
+                return;
+            }
+        }
+
+        // Agar hammasi qilingan bo'lsa, oxirgisini ko'rsatish
+        $this->lesson_number = min($this->lesson_number + 1, $maxLesson);
+        $this->lesson_date = now()->format('Y-m-d');
+        $this->loadAttendance();
     }
 
     public function toggleAttendance(int $enrollmentId): void
@@ -342,19 +434,13 @@ class GroupDetail extends Component
 
     public function unenrollStudent(Enrollment $enrollment): void
     {
-        // Joriy oydagi qarzdorlikni hisoblash
-        $enrollment->load(['student.activeDiscounts', 'group.course', 'payments']);
-        $currentPeriod = now()->format('Y-m');
-        $coursePrice = $enrollment->group->course->monthly_price;
-        $discount = $enrollment->student->calculateTotalDiscount($coursePrice);
-        $required = $coursePrice - $discount;
-        $paid = $enrollment->payments->where('period', $currentPeriod)->sum('amount');
-        $remaining = max(0, $required - $paid);
+        // OutstandingDebt yaratish (darslar bo'yicha hisob-kitob)
+        $debt = OutstandingDebt::createFromEnrollment($enrollment, 'dropped');
 
         $enrollment->update([
             'status' => 'dropped',
             'dropped_at' => now(),
-            'final_balance' => $remaining,
+            'final_balance' => $debt?->original_amount ?? 0,
         ]);
 
         $this->dispatch('student-removed');

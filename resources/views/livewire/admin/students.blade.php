@@ -105,23 +105,25 @@
                             <flux:checkbox wire:model.live="selected" value="{{ $student->id }}" />
                         </td>
                         <td class="px-4 py-3">
-                            <div class="font-medium">{{ $student->name }}</div>
+                            <a href="{{ route('admin.students.show', $student) }}" wire:navigate class="font-medium text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                                {{ $student->name }}
+                            </a>
                             @if ($student->address)
                                 <div class="text-xs text-zinc-500">{{ $student->address }}</div>
                             @endif
                         </td>
                         <td class="px-4 py-3">
-                            <div>{{ $student->phone }}</div>
-                            @if ($student->home_phone)
-                                <div class="text-xs text-zinc-500">{{ $student->home_phone }} (Uy)</div>
-                            @endif
-                            @foreach ($student->phones as $extraPhone)
-                                <div class="text-xs text-zinc-500">
-                                    {{ $extraPhone->number }}
-                                    @if ($extraPhone->owner)
-                                        ({{ $extraPhone->owner }})
-                                    @endif
-                                </div>
+                            @foreach ($student->phones->sortByDesc('is_primary') as $phoneItem)
+                                @if ($phoneItem->is_primary)
+                                    <div>{{ $phoneItem->number }}</div>
+                                @else
+                                    <div class="text-xs text-zinc-500">
+                                        {{ $phoneItem->number }}
+                                        @if ($phoneItem->owner)
+                                            ({{ $phoneItem->owner }})
+                                        @endif
+                                    </div>
+                                @endif
                             @endforeach
                         </td>
                         <td class="px-4 py-3">
@@ -156,6 +158,7 @@
                             </div>
                         </td>
                         <td class="px-4 py-3 text-right">
+                            <flux:button variant="ghost" size="sm" :href="route('admin.students.show', $student)" icon="eye" title="Ko'rish" wire:navigate />
                             <flux:button variant="ghost" size="sm" wire:click="openEnrollModal({{ $student->id }})" icon="plus" title="Guruhga qo'shish" />
                             <flux:button variant="ghost" size="sm" wire:click="openDiscountModal({{ $student->id }})" icon="receipt-percent" title="Chegirmalar" />
                             <flux:button variant="ghost" size="sm" wire:click="edit({{ $student->id }})" icon="pencil" />
@@ -255,7 +258,7 @@
                 <flux:select.option value="">Tanlang...</flux:select.option>
                 @foreach ($this->availableGroups as $group)
                     <flux:select.option value="{{ $group->id }}">
-                        {{ $group->course->code }} | {{ $group->name }} | {{ $group->teacher->name }} | {{ $group->days_label }} ({{ $group->enrollments_count }}/{{ $group->room->capacity }})
+                        {{ $group->course->code }} | {{ $group->name }} | {{ $group->teacher->name }} | {{ $group->days_label }} {{ $group->start_time?->format('H:i') }}-{{ $group->end_time?->format('H:i') }} ({{ $group->enrollments_count }}/{{ $group->room->capacity }})
                     </flux:select.option>
                 @endforeach
             </flux:select>
@@ -388,7 +391,7 @@
                 <flux:select.option value="">Tanlang...</flux:select.option>
                 @foreach ($this->availableGroups as $group)
                     <flux:select.option value="{{ $group->id }}">
-                        {{ $group->course->code }} | {{ $group->name }} | {{ $group->teacher->name }} | {{ $group->days_label }} ({{ $group->enrollments_count }}/{{ $group->room->capacity }})
+                        {{ $group->course->code }} | {{ $group->name }} | {{ $group->teacher->name }} | {{ $group->days_label }} {{ $group->start_time?->format('H:i') }}-{{ $group->end_time?->format('H:i') }} ({{ $group->enrollments_count }}/{{ $group->room->capacity }})
                     </flux:select.option>
                 @endforeach
             </flux:select>

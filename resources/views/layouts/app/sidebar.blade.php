@@ -31,9 +31,15 @@
                     <flux:sidebar.item icon="clipboard-document-check" :href="route('admin.attendance')" :current="request()->routeIs('admin.attendance')" wire:navigate>
                         Davomat
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="calendar-days" :href="route('admin.schedule')" :current="request()->routeIs('admin.schedule')" wire:navigate>
+                        Dars jadvali
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
 
                 <flux:sidebar.group heading="Moliya" class="grid">
+                    <flux:sidebar.item icon="exclamation-triangle" :href="route('admin.debts')" :current="request()->routeIs('admin.debts')" wire:navigate>
+                        Qarzdorliklar
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="arrow-trending-down" :href="route('admin.expenses')" :current="request()->routeIs('admin.expenses')" wire:navigate>
                         Harajatlar
                     </flux:sidebar.item>

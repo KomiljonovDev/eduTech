@@ -214,7 +214,7 @@ class Leads extends Component
     {
         $student = $lead->convertToStudent();
 
-        $this->redirect(route('admin.students', ['search' => $student->phone]), navigate: true);
+        $this->redirect(route('admin.students', ['search' => $student->display_phone]), navigate: true);
     }
 
     public function delete(Lead $lead): void

@@ -14,14 +14,10 @@
     </div>
 
     {{-- Group Info Cards --}}
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
             <flux:text class="text-zinc-500">Ustoz</flux:text>
             <flux:heading>{{ $group->teacher->name }}</flux:heading>
-        </div>
-        <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-            <flux:text class="text-zinc-500">Xona</flux:text>
-            <flux:heading>{{ $group->room->name }}</flux:heading>
         </div>
         <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
             <flux:text class="text-zinc-500">Jadval</flux:text>
@@ -29,8 +25,21 @@
             <flux:text class="text-sm">{{ $group->start_time?->format('H:i') }} - {{ $group->end_time?->format('H:i') }}</flux:text>
         </div>
         <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+            <flux:text class="text-zinc-500">Boshlangan</flux:text>
+            <flux:heading>{{ $group->start_date?->format('d.m.Y') ?? '—' }}</flux:heading>
+        </div>
+        <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+            <flux:text class="text-zinc-500">Darslar</flux:text>
+            @php $completedLessons = collect($this->lessonDates)->filter()->count(); @endphp
+            <flux:heading>{{ $completedLessons }} / {{ $group->total_lessons }}</flux:heading>
+            <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                <div class="h-full bg-blue-500" style="width: {{ $group->total_lessons > 0 ? ($completedLessons / $group->total_lessons * 100) : 0 }}%"></div>
+            </div>
+        </div>
+        <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
             <flux:text class="text-zinc-500">O'quvchilar</flux:text>
             <flux:heading>{{ $this->enrollments->count() }} / {{ $group->room->capacity }}</flux:heading>
+            <flux:text class="text-sm text-zinc-400">{{ $group->room->name }}</flux:text>
         </div>
         <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
             <flux:text class="text-zinc-500">Narx</flux:text>
@@ -114,7 +123,9 @@
                             <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                                 <td class="px-4 py-3 text-zinc-500">{{ $index + 1 }}</td>
                                 <td class="px-4 py-3">
-                                    <div class="font-medium">{{ $enrollment->student->name }}</div>
+                                    <a href="{{ route('admin.students.show', $enrollment->student) }}" wire:navigate class="font-medium text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                                        {{ $enrollment->student->name }}
+                                    </a>
                                     @if ($enrollment->student->activeDiscounts->count() > 0)
                                         <div class="flex flex-wrap gap-1 mt-1">
                                             @foreach ($enrollment->student->activeDiscounts as $discount)
@@ -190,12 +201,43 @@
     {{-- Attendance Tab --}}
     @if ($activeTab === 'attendance')
         <div class="space-y-4">
+            {{-- Lesson progress indicators --}}
+            <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
+                <div class="mb-2 flex items-center justify-between">
+                    <flux:text class="text-sm text-zinc-500">Darslar holati</flux:text>
+                    <flux:text class="text-xs text-zinc-400">
+                        {{ collect($this->lessonDates)->filter()->count() }} / {{ $group->total_lessons }} dars o'tilgan
+                    </flux:text>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                    @foreach ($this->lessonDates as $num => $date)
+                        <button
+                            wire:click="$set('lesson_number', {{ $num }})"
+                            class="flex h-8 w-8 items-center justify-center rounded text-xs font-medium transition-colors
+                                {{ $num == $lesson_number ? 'ring-2 ring-blue-500 ring-offset-1' : '' }}
+                                {{ $date ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-600' }}"
+                            title="{{ $date ? $num . '-dars: ' . $date : $num . '-dars: belgilanmagan' }}"
+                        >
+                            {{ $num }}
+                        </button>
+                    @endforeach
+                </div>
+                <div class="mt-2 flex gap-4 text-xs text-zinc-500">
+                    <span class="flex items-center gap-1">
+                        <span class="h-3 w-3 rounded bg-green-100 dark:bg-green-900/30"></span> O'tilgan
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <span class="h-3 w-3 rounded bg-zinc-200 dark:bg-zinc-700"></span> O'tilmagan
+                    </span>
+                </div>
+            </div>
+
             {{-- Lesson selector --}}
             <div class="flex flex-wrap items-end gap-4">
                 <flux:select wire:model.live="lesson_number" label="Dars raqami" class="w-48">
                     @foreach ($this->lessonDates as $num => $date)
                         <flux:select.option value="{{ $num }}">
-                            {{ $num }}-dars {{ $date ? "($date)" : '' }}
+                            {{ $num }}-dars {{ $date ? "✓ ($date)" : '' }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
@@ -232,7 +274,11 @@
                             @php $stats = $this->getAttendanceStats($enrollment); @endphp
                             <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50" wire:key="att-{{ $enrollment->id }}">
                                 <td class="px-4 py-3 text-zinc-500">{{ $index + 1 }}</td>
-                                <td class="px-4 py-3 font-medium">{{ $enrollment->student->name }}</td>
+                                <td class="px-4 py-3">
+                                    <a href="{{ route('admin.students.show', $enrollment->student) }}" wire:navigate class="font-medium text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                                        {{ $enrollment->student->name }}
+                                    </a>
+                                </td>
                                 <td class="px-4 py-3 text-center">
                                     @if ($stats['total'] > 0)
                                         <div class="inline-flex items-center gap-2">
@@ -443,7 +489,7 @@
                             <div class="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
                                 <div>
                                     <div class="font-medium">{{ $student->name }}</div>
-                                    <div class="text-sm text-zinc-500">{{ $student->phone }}</div>
+                                    <div class="text-sm text-zinc-500">{{ $student->display_phone }}</div>
                                 </div>
                                 <flux:button variant="primary" size="sm" wire:click="addStudentDirect({{ $student->id }})" icon="plus">
                                     Qo'shish
@@ -476,15 +522,50 @@
 
     {{-- Toast notifications --}}
     <div
-        x-data="{ show: false, message: '' }"
-        @attendance-saved.window="show = true; message = 'Davomat saqlandi!'; setTimeout(() => show = false, 3000)"
-        @payment-collected.window="show = true; message = 'Tolov qabul qilindi!'; setTimeout(() => show = false, 3000)"
-        @student-added.window="show = true; message = 'Oquvchi qoshildi!'; setTimeout(() => show = false, 3000)"
-        @student-removed.window="show = true; message = 'Oquvchi chiqarildi!'; setTimeout(() => show = false, 3000)"
+        x-data="{ show: false, message: '', type: 'success' }"
+        @attendance-saved.window="show = true; message = 'Davomat saqlandi!'; type = 'success'; setTimeout(() => show = false, 3000)"
+        @payment-collected.window="show = true; message = 'Tolov qabul qilindi!'; type = 'success'; setTimeout(() => show = false, 3000)"
+        @student-added.window="show = true; message = 'Oquvchi qoshildi!'; type = 'success'; setTimeout(() => show = false, 3000)"
+        @student-removed.window="show = true; message = 'Oquvchi chiqarildi!'; type = 'success'; setTimeout(() => show = false, 3000)"
+        @group-completed.window="show = true; message = 'Guruh tugallandi! Qarzlar hisoblab yozildi.'; type = 'info'; setTimeout(() => show = false, 5000)"
         x-show="show"
         x-transition
-        class="fixed bottom-4 right-4 rounded-lg bg-green-600 px-4 py-2 text-white shadow-lg"
+        class="fixed bottom-4 right-4 rounded-lg px-4 py-2 text-white shadow-lg"
+        :class="type === 'info' ? 'bg-blue-600' : 'bg-green-600'"
     >
         <span x-text="message"></span>
     </div>
+
+    {{-- Tugallangan guruh uchun qarzlar ro'yxati --}}
+    @if ($group->status === 'completed')
+        @php
+            $debts = $this->allEnrollments->where('final_balance', '>', 0);
+        @endphp
+        @if ($debts->count() > 0)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+                <div class="flex items-start gap-3">
+                    <flux:icon.exclamation-triangle class="size-5 text-amber-600" />
+                    <div class="flex-1">
+                        <flux:heading size="sm" class="text-amber-800 dark:text-amber-200">
+                            Tugallangan guruhda qarzlar mavjud
+                        </flux:heading>
+                        <div class="mt-2 space-y-1">
+                            @foreach ($debts as $enrollment)
+                                <div class="flex items-center justify-between text-sm">
+                                    <span>{{ $enrollment->student->name }}</span>
+                                    <span class="font-medium text-red-600">{{ number_format($enrollment->final_balance, 0, '', ' ') }} so'm</span>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="mt-2 border-t border-amber-200 pt-2 dark:border-amber-700">
+                            <div class="flex items-center justify-between font-medium">
+                                <span>Jami qarz:</span>
+                                <span class="text-red-600">{{ number_format($debts->sum('final_balance'), 0, '', ' ') }} so'm</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endif
 </div>

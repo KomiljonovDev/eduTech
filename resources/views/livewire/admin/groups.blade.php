@@ -69,6 +69,7 @@
                     <th class="px-4 py-3 text-left font-medium">Yo'nalish</th>
                     <th class="px-4 py-3 text-left font-medium">Ustoz</th>
                     <th class="px-4 py-3 text-left font-medium">Jadval</th>
+                    <th class="px-4 py-3 text-left font-medium">Boshlangan</th>
                     <th class="px-4 py-3 text-left font-medium">Xona</th>
                     <th class="px-4 py-3 text-left font-medium">O'quvchilar</th>
                     <th class="px-4 py-3 text-left font-medium">Holat</th>
@@ -90,6 +91,9 @@
                         <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                             <div>{{ $group->days_label }}</div>
                             <div class="text-xs">{{ $group->start_time->format('H:i') }} - {{ $group->end_time->format('H:i') }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                            {{ $group->start_date?->format('d.m.Y') ?? '—' }}
                         </td>
                         <td class="px-4 py-3">{{ $group->room->name }}</td>
                         <td class="px-4 py-3">
@@ -120,7 +124,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-zinc-500">
+                        <td colspan="9" class="px-4 py-8 text-center text-zinc-500">
                             Hozircha guruhlar yo'q
                         </td>
                     </tr>

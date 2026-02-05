@@ -6,6 +6,7 @@ use App\Models\Enrollment;
 use App\Models\Expense;
 use App\Models\Group;
 use App\Models\Lead;
+use App\Models\OutstandingDebt;
 use App\Models\Payment;
 use App\Models\Student;
 use Livewire\Attributes\Computed;
@@ -88,6 +89,11 @@ class Dashboard extends Component
             }
         }
 
+        // O'tkazib yuborilgan qarzlar (completed/dropped)
+        $overdueDebts = OutstandingDebt::outstanding();
+        $overdueCount = $overdueDebts->count();
+        $overdueAmount = $overdueDebts->sum('remaining_amount');
+
         return [
             'total_students' => $totalStudents,
             'active_students' => $activeStudents,
@@ -106,6 +112,8 @@ class Dashboard extends Component
             'net_income_change' => $netIncomeChange,
             'outstanding_count' => $outstandingCount,
             'outstanding_amount' => $outstandingAmount,
+            'overdue_count' => $overdueCount,
+            'overdue_amount' => $overdueAmount,
         ];
     }
 

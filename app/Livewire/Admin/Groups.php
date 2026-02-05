@@ -62,7 +62,7 @@ class Groups extends Component
     protected function rules(): array
     {
         return [
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', 'unique:groups,name'.($this->editingId ? ','.$this->editingId : '')],
             'course_id' => 'required|exists:courses,id',
             'teacher_id' => 'required|exists:teachers,id',
             'room_id' => 'required|exists:rooms,id',
@@ -72,6 +72,13 @@ class Groups extends Component
             'total_lessons' => 'required|integer|min:1|max:100',
             'start_date' => 'required|date',
             'status' => 'required|in:pending,active,completed,cancelled',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'name.unique' => 'Bu nom bilan guruh allaqachon mavjud.',
         ];
     }
 

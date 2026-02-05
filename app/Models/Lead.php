@@ -118,17 +118,34 @@ class Lead extends Model
     {
         $student = Student::create([
             'name' => $this->name,
-            'phone' => $this->phone,
-            'home_phone' => $this->home_phone,
             'source' => $this->source,
             'notes' => $this->notes,
         ]);
 
-        // Copy additional phones
+        // Create primary phone
+        if ($this->phone) {
+            $student->phones()->create([
+                'number' => $this->phone,
+                'owner' => null,
+                'is_primary' => true,
+            ]);
+        }
+
+        // Create home phone
+        if ($this->home_phone) {
+            $student->phones()->create([
+                'number' => $this->home_phone,
+                'owner' => 'Uy',
+                'is_primary' => false,
+            ]);
+        }
+
+        // Copy additional phones from lead
         foreach ($this->phones as $phone) {
             $student->phones()->create([
                 'number' => $phone->number,
                 'owner' => $phone->owner,
+                'is_primary' => false,
             ]);
         }
 

@@ -70,10 +70,16 @@ class StudentSearchTool extends Tool
 
             $output .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
             $output .= "{$statusIcon} #{$student->id} {$student->name}\n";
-            $output .= "📱 Tel: {$student->phone}\n";
 
-            if ($student->home_phone) {
-                $output .= "🏠 Uy tel: {$student->home_phone}\n";
+            foreach ($student->phones as $phoneItem) {
+                if ($phoneItem->is_primary) {
+                    $output .= "📱 Tel: {$phoneItem->number}\n";
+                } elseif ($phoneItem->owner === 'Uy') {
+                    $output .= "🏠 Uy tel: {$phoneItem->number}\n";
+                } else {
+                    $ownerLabel = $phoneItem->owner ? " ({$phoneItem->owner})" : '';
+                    $output .= "📞 {$phoneItem->number}{$ownerLabel}\n";
+                }
             }
             if ($student->address) {
                 $output .= "📍 Manzil: {$student->address}\n";

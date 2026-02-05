@@ -122,7 +122,7 @@ class LeadShow extends Component
     {
         $student = $this->lead->convertToStudent();
 
-        $this->redirect(route('admin.students', ['search' => $student->phone]), navigate: true);
+        $this->redirect(route('admin.students', ['search' => $student->display_phone]), navigate: true);
     }
 
     public function render()

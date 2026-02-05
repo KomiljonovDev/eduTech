@@ -16,20 +16,28 @@ Laravel 12 starter kit with Livewire 4 for reactive UI components. Uses Fortify 
 
 ## Development Commands
 
+### Docker Environment
+
+Loyiha Docker orqali ishlaydi. Barcha PHP/Artisan buyruqlarini container ichida bajarish kerak:
+
 ```bash
-# Full development environment (PHP server + queue + logs + Vite)
-composer dev
+# Container ichida buyruq bajarish
+docker exec -it edutech_app <command>
 
-# Run test suite (includes lint check)
-composer test
+# Artisan buyruqlari
+docker exec -it edutech_app php artisan migrate
+docker exec -it edutech_app php artisan test --compact
+docker exec -it edutech_app php artisan tinker
 
-# Fix code style
-composer lint
-# Or directly: vendor/bin/pint --dirty --format agent
+# Composer buyruqlari
+docker exec -it edutech_app composer install
+docker exec -it edutech_app composer test
+docker exec -it edutech_app vendor/bin/pint --dirty
+```
 
-# Initial setup
-composer setup
+### Local Commands (container tashqarisida)
 
+```bash
 # Frontend only
 npm run dev      # Development server
 npm run build    # Production build
@@ -128,6 +136,18 @@ Use these tools when available:
 - Use `casts()` method rather than `$casts` property
 - Create factories and seeders when creating new models
 - Use proper Eloquent relationship methods with return type hints
+
+### Migrations (Production Policy)
+
+**MUHIM**: Bu loyiha production muhitida ishlaydi. Migrationlar hech qachon orqaga qaytarilmaydi!
+
+- **HECH QACHON** mavjud migration fayllarni o'zgartirmang
+- Yangi column qo'shish - yangi migration fayl yarating
+- Column o'chirish - yangi migration fayl yarating
+- Column nomini o'zgartirish - yangi migration fayl yarating
+- Ma'lumotlarni migrate qilish - yangi migration fayl yarating
+- `php artisan migrate:rollback` - **ISHLATILMAYDI**
+- `php artisan migrate:fresh` - faqat local development uchun
 
 ### Testing
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Student extends Model
 {
@@ -31,33 +32,63 @@ class Student extends Model
         ];
     }
 
+    /**
+     * Get all phone numbers (polymorphic relationship).
+     */
     public function phones(): MorphMany
     {
         return $this->morphMany(Phone::class, 'phoneable');
     }
 
     /**
+     * Get the primary phone number.
+     */
+    public function primaryPhone(): MorphOne
+    {
+        return $this->morphOne(Phone::class, 'phoneable')->where('is_primary', true);
+    }
+
+    /**
+     * Get the home phone number.
+     */
+    public function homePhone(): MorphOne
+    {
+        return $this->morphOne(Phone::class, 'phoneable')->where('owner', 'Uy');
+    }
+
+    /**
+     * Get extra phone numbers (non-primary, non-home).
+     */
+    public function extraPhones(): MorphMany
+    {
+        return $this->morphMany(Phone::class, 'phoneable')
+            ->where('is_primary', false)
+            ->where(function ($query) {
+                $query->whereNull('owner')
+                    ->orWhere('owner', '!=', 'Uy');
+            });
+    }
+
+    /**
      * Get all phone numbers with their owners.
      *
-     * @return array<int, array{number: string, owner: string|null}>
+     * @return array<int, array{number: string, owner: string|null, is_primary: bool}>
      */
     public function getAllPhones(): array
     {
-        $phones = [];
+        return $this->phones->map(fn (Phone $phone) => [
+            'number' => $phone->number,
+            'owner' => $phone->owner,
+            'is_primary' => $phone->is_primary,
+        ])->toArray();
+    }
 
-        if ($this->phone) {
-            $phones[] = ['number' => $this->phone, 'owner' => null];
-        }
-
-        if ($this->home_phone) {
-            $phones[] = ['number' => $this->home_phone, 'owner' => 'Uy'];
-        }
-
-        foreach ($this->phones as $phone) {
-            $phones[] = ['number' => $phone->number, 'owner' => $phone->owner];
-        }
-
-        return $phones;
+    /**
+     * Get the display phone number (primary phone or first available).
+     */
+    public function getDisplayPhoneAttribute(): ?string
+    {
+        return $this->primaryPhone?->number ?? $this->phones->first()?->number;
     }
 
     public function enrollments(): HasMany

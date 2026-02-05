@@ -100,24 +100,46 @@
         </div>
     </div>
 
-    {{-- Second Row --}}
-    <div class="grid gap-6 lg:grid-cols-2">
-        {{-- Outstanding Payments Alert --}}
+    {{-- Alerts Row --}}
+    <div class="grid gap-4 lg:grid-cols-2">
+        {{-- Outstanding Payments Alert (joriy oy) --}}
         @if ($stats['outstanding_count'] > 0)
-            <div class="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 lg:col-span-2">
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-900/20">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                            <flux:icon.clock class="size-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                            <flux:heading class="text-amber-700 dark:text-amber-300">Joriy oy qarzdorlari</flux:heading>
+                            <flux:text class="text-amber-600 dark:text-amber-400">
+                                {{ $stats['outstanding_count'] }} ta o'quvchi - {{ number_format($stats['outstanding_amount'], 0, '', ' ') }} so'm
+                            </flux:text>
+                        </div>
+                    </div>
+                    <flux:button variant="subtle" :href="route('admin.reports', ['report' => 'outstanding'])" wire:navigate icon="arrow-right" icon-trailing>
+                        Ko'rish
+                    </flux:button>
+                </div>
+            </div>
+        @endif
+
+        {{-- Overdue Debts Alert (o'tkazib yuborilgan) --}}
+        @if ($stats['overdue_count'] > 0)
+            <div class="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30">
                             <flux:icon.exclamation-triangle class="size-6 text-red-600 dark:text-red-400" />
                         </div>
                         <div>
-                            <flux:heading class="text-red-700 dark:text-red-300">To'lanmagan to'lovlar</flux:heading>
+                            <flux:heading class="text-red-700 dark:text-red-300">O'tkazib yuborilgan qarzlar</flux:heading>
                             <flux:text class="text-red-600 dark:text-red-400">
-                                {{ $stats['outstanding_count'] }} ta o'quvchi - jami {{ number_format($stats['outstanding_amount'], 0, '', ' ') }} so'm
+                                {{ $stats['overdue_count'] }} ta - {{ number_format($stats['overdue_amount'], 0, '', ' ') }} so'm
                             </flux:text>
                         </div>
                     </div>
-                    <flux:button variant="filled" color="red" :href="route('admin.reports', ['report' => 'outstanding'])" wire:navigate icon="arrow-right" icon-trailing>
+                    <flux:button variant="filled" color="red" :href="route('admin.debts')" wire:navigate icon="arrow-right" icon-trailing>
                         Ko'rish
                     </flux:button>
                 </div>
